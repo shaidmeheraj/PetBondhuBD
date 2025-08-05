@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "778250207853",
+    "project_id": "fire-setup-1b95d",
+    "storage_bucket": "fire-setup-1b95d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:778250207853:android:6ee6de8032bacc8e79f564",
+        "android_client_info": {
+          "package_name": "com.example.petbondhubd"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBdC4J9HkbGG5ywUpibQ9M8s3pPBCanIM8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
