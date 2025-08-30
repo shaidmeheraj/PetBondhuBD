@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import 'lost_pet_alert_page.dart';
+import 'daily_care_tracker_tab.dart';
+import 'emergency_contact_page.dart';
+import 'community_forum_page.dart';
+import 'adoption_petshop_page.dart';
 
 class DashboardHome extends StatelessWidget {
   final String userName;
@@ -16,13 +21,24 @@ class DashboardHome extends StatelessWidget {
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.deepPurple),
           ),
           const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _QuickButton(icon: Icons.add, label: "Add Pet", color: Colors.purple),
-              _QuickButton(icon: Icons.pets, label: "View Pet Profile", color: Colors.blue),
-              _QuickButton(icon: Icons.medical_services, label: "Add Reminder", color: Colors.cyan),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                alignment: WrapAlignment.center,
+                children: [
+                  _QuickButton(icon: Icons.add, label: "Add Pet", color: Colors.purple),
+                  _QuickButton(icon: Icons.pets, label: "View Pet Profile", color: Colors.blue),
+                  _QuickButton(icon: Icons.medical_services, label: "Add Reminder", color: Colors.cyan),
+                  _LostFoundButton(),
+                  _DailyCareButton(),
+                  _EmergencyContactButton(),
+                  _CommunityForumButton(),
+                  _AdoptionPetShopButton(),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 32),
           Text("Overview", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.black87)),
@@ -72,6 +88,126 @@ class _QuickButton extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+}
+
+class _LostFoundButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Material(
+          color: Colors.red.withOpacity(0.15),
+          shape: const CircleBorder(),
+          child: IconButton(
+            icon: const Icon(Icons.location_on, color: Colors.red, size: 32),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const LostPetAlertPage()),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text('Lost & Found', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+}
+
+class _DailyCareButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Material(
+          color: Colors.teal.withOpacity(0.15),
+          shape: const CircleBorder(),
+          child: IconButton(
+            icon: const Icon(Icons.calendar_today, color: Colors.teal, size: 32),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => DailyCareTrackerTab()),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text('Daily Care', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+}
+
+class _EmergencyContactButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Material(
+          color: Colors.red.withOpacity(0.15),
+          shape: const CircleBorder(),
+          child: IconButton(
+            icon: const Icon(Icons.local_hospital, color: Colors.red, size: 32),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => EmergencyContactPage()),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text('Emergency', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+}
+
+class _CommunityForumButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Material(
+          color: Colors.deepPurple.withOpacity(0.15),
+          shape: const CircleBorder(),
+          child: IconButton(
+            icon: const Icon(Icons.forum, color: Colors.deepPurple, size: 32),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const CommunityForumPage()),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text('Forum', style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+}
+
+class _AdoptionPetShopButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Material(
+          color: Colors.orange.withOpacity(0.15),
+          shape: const CircleBorder(),
+          child: IconButton(
+            icon: const Icon(Icons.store, color: Colors.orange, size: 32),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const AdoptionPetShopPage()),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text('Adoption & Shop', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600)),
       ],
     );
   }
