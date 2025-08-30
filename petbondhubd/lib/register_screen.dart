@@ -1,37 +1,61 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
-class RegisterScreen extends StatelessWidget {
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
+
+  @override
+  State<RegisterScreen> createState() => _RegisterScreenState();
+}
+
+class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController emailCtrl = TextEditingController();
   final TextEditingController passCtrl = TextEditingController();
 
-  Future<void> register(BuildContext context) async {
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailCtrl.text,
-        password: passCtrl.text,
+  @override
+  void dispose() {
+    emailCtrl.dispose();
+    passCtrl.dispose();
+    super.dispose();
+  }
+
+  void register(BuildContext context) {
+    // আপাতত শুধু একটি Snackbar দেখাবে
+    if (emailCtrl.text.isNotEmpty && passCtrl.text.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Registered with email: ${emailCtrl.text}")),
       );
-      Navigator.pop(context);
-    } catch (e) {
-      print("Registration failed: $e");
+      Navigator.pop(context); // success হলে আগের স্ক্রিনে ফেরত যাবে
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter email and password")),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Register")),
+      appBar: AppBar(title: const Text("Register")),
       body: Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(children: [
-          TextField(controller: emailCtrl, decoration: InputDecoration(labelText: "Email")),
-          TextField(controller: passCtrl, decoration: InputDecoration(labelText: "Password"), obscureText: true),
-          SizedBox(height: 20),
-          ElevatedButton(
+        child: Column(
+          children: [
+            TextField(
+              controller: emailCtrl,
+              decoration: const InputDecoration(labelText: "Email"),
+            ),
+            TextField(
+              controller: passCtrl,
+              decoration: const InputDecoration(labelText: "Password"),
+              obscureText: true,
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
               onPressed: () => register(context),
-              child: Text("Register")
-          ),
-        ]),
+              child: const Text("Register"),
+            ),
+          ],
+        ),
       ),
     );
   }

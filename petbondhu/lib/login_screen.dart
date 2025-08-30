@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'pet_description_screen.dart';
 import 'register_screen.dart';
+import 'home_page.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,17 +17,11 @@ class _LoginScreenState extends State<LoginScreen> {
   String correctPass = "123456";
 
   void login() {
-    if (emailCtrl.text == correctEmail && passCtrl.text == correctPass) {
-      // Success: Go to Home Page (PetDescriptionScreen as Home)
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const PetDescriptionScreen()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid email or password")),
-      );
-    }
+    // Directly go to HomePage without checking credentials
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const HomePage()),
+    );
   }
 
   @override
