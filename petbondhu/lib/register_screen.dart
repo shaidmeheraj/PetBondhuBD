@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -10,6 +12,8 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController emailCtrl = TextEditingController();
   final TextEditingController passCtrl = TextEditingController();
+  String selectedRole = 'Pet Lover';
+  bool isLoading = false;
 
   @override
   void dispose() {
@@ -18,13 +22,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void register(BuildContext context) {
+  Future<void> register(BuildContext context) async {
     if (emailCtrl.text.isNotEmpty && passCtrl.text.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Registered with email: ${emailCtrl.text}")),
-      );
-      // Return to login page after successful registration
-      Navigator.pop(context);
+      setState(() => isLoading = true);
+      try {
+        final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: emailCtrl.text.trim(),
+          password: passCtrl.text.trim(),
+        );
+        // Create user document in Firestore
+        await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+          'email': userCredential.user!.email,
+          'role': selectedRole,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Registration successful! Please login.")),
+        );
+        Navigator.pop(context);
+      } on FirebaseAuthException catch (e) {
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? "Registration failed")),
+        );
+      } catch (e) {
+        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Registration failed")),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please enter email and password")),
@@ -106,30 +133,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       obscureText: true,
                     ),
-                    const SizedBox(height: 24),
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 1, end: 1.05),
-                      duration: const Duration(milliseconds: 800),
-                      curve: Curves.elasticInOut,
-                      builder: (context, scale, child) {
-                        return Transform.scale(
-                          scale: scale,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.deepPurple,
-                              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              elevation: 6,
-                            ),
-                            onPressed: () => register(context),
-                            child: const Text(
-                              "Register",
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                            ),
-                          ),
-                        );
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: selectedRole,
+                      decoration: const InputDecoration(labelText: 'Role'),
+                      items: ['Pet Lover', 'Admin']
+                          .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => selectedRole = val);
                       },
                     ),
+                    const SizedBox(height: 24),
+                    isLoading
+                        ? const CircularProgressIndicator()
+                        : TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 1, end: 1.05),
+                            duration: const Duration(milliseconds: 800),
+                            curve: Curves.elasticInOut,
+                            builder: (context, scale, child) {
+                              return Transform.scale(
+                                scale: scale,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.deepPurple,
+                                    padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                    elevation: 6,
+                                  ),
+                                  onPressed: () => register(context),
+                                  child: const Text(
+                                    "Register",
+                                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                   ],
                 ),
               ),

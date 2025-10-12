@@ -1,0 +1,44 @@
+name: petbondhu1
+description: "A new Flutter project."
+publish_to: 'none' # Prevents accidental publishing
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  intl: ^0.20.2
+  fl_chart: ^0.64.0
+  url_launcher: ^6.3.2
+
+  # Firebase
+  # firebase_core must match what firebase_auth requires (6.x auth requires 4.x core)
+  firebase_core: ^4.1.1
+  firebase_auth: ^6.1.0
+  cloud_firestore: ^6.0.2
+  firebase_storage: ^13.0.2
+
+  # Image + TFLite
+  image_picker: ^0.8.7+3
+  image: ^3.0.2
+  tflite_flutter: ^0.11.0
+  
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/labels.txt
+    - assets/final_model_100epoch.tflite
+
+dependency_overrides:
+  camera: ^0.11.2
