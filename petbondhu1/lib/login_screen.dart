@@ -1,8 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'pet_lover/home_page.dart';
 import 'admin_dashboard_page.dart';
-import 'register_screen.dart'; // ✅ Import your register screen
+import 'pet_lover/dashboard_home.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,9 +17,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController passCtrl = TextEditingController();
   bool isLoading = false;
 
-  // Default admin credentials (development convenience)
-  static const String _adminEmail = 'admin@gmail.com';
-  static const String _adminPassword = '123456';
+  // ✅ Fixed admin credentials
+  static const String adminEmail = 'admin@gmail.com';
+  static const String adminPassword = '123456';
 
   @override
   void dispose() {
@@ -27,93 +28,165 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  Future<void> login(BuildContext context) async {
+  Future<void> login() async {
     final email = emailCtrl.text.trim();
-    final password = passCtrl.text;
+    final password = passCtrl.text.trim();
+
     if (email.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter email and password')));
-      return;
-    }
-
-    // Local short-circuit for the default admin credential:
-    // If both email AND password match the default admin values, go to admin dashboard.
-    // (This avoids calling FirebaseAuth if you want a quick local admin login.)
-    if (email.toLowerCase() == _adminEmail.toLowerCase() && password == _adminPassword) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
-      );
-      return;
-    }
-
-    // Normal Firebase sign-in for regular users (Pet Lover)
-    setState(() => isLoading = true);
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
-
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const PetLoverHomePage()),
-      );
-    } on FirebaseAuthException catch (e) {
-      String msg = 'Login failed';
-      if (e.code == 'user-not-found') msg = 'No user found for that email.';
-      else if (e.code == 'wrong-password') msg = 'Wrong password provided.';
-      else if (e.message != null) msg = e.message!;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login error: $e')));
-    } finally {
-      if (mounted) setState(() => isLoading = false);
-    }
-  }
-
-  // Optional helper: Try signing in admin with Firebase; if missing, offer a local fallback.
-  Future<void> _adminLogin(BuildContext context) async {
-    setState(() => isLoading = true);
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(email: _adminEmail, password: _adminPassword);
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
-      );
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'user-not-found') {
-        final proceed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Admin account not found'),
-            content: const Text('No admin account exists in Firebase with the default credentials. Continue to admin dashboard locally?'),
-            actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-              TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continue')),
-            ],
-          ),
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter email and password')),
         );
-        if (proceed == true && mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
+      } else {
+        // ignore: avoid_print
+        print('Please enter email and password');
+      }
+      return;
+    }
+
+    setState(() => isLoading = true);
+
+    try {
+      // 🟣 Step 1: Check for fixed admin account
+      if (email.toLowerCase() == adminEmail && password == adminPassword) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
           );
         }
+        return;
+      }
+
+      // 🟢 Step 2: Sign in with Firebase
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('User not found')),
+          );
+        } else {
+          // ignore: avoid_print
+          print('User not found');
+        }
+        return;
+      }
+
+      // 🟡 Step 3: Check Firestore for user role (optional, fallback to user)
+      String role = 'user';
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (doc.exists && doc.data()?['role'] != null) {
+          role = doc['role'].toString().toLowerCase();
+        }
+        else if (!doc.exists) {
+          // Create a minimal profile document for this user if allowed by rules.
+          try {
+            await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+              'uid': user.uid,
+              'email': user.email ?? '',
+              'role': 'user',
+              'createdAt': FieldValue.serverTimestamp(),
+            });
+          } catch (_) {
+            // ignore write errors (rules may prevent it)
+          }
+        }
+      } catch (e) {
+        // Ignore Firestore errors for normal user login
+      }
+
+      // 🟢 Step 4: Redirect based on role
+      if (mounted) {
+        if (role == 'admin') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const AdminDashboardPage()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DashboardHome(
+                userName: user.email ?? "User",
+              ),
+            ),
+          );
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'No user found with this email.';
+          break;
+        case 'wrong-password':
+          message = 'Incorrect password.';
+          break;
+        case 'invalid-email':
+          message = 'Invalid email format.';
+          break;
+        case 'network-request-failed':
+          message = 'Network error. Check your internet connection.';
+          break;
+        default:
+          message = e.message ?? 'Login failed.';
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message ?? 'Admin login failed')));
+        // If state unmounted, print for debugging.
+        // ignore: avoid_print
+        print('Login error (unmounted): $message');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Admin login error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      } else {
+        // ignore: avoid_print
+        print('Login exception (unmounted): $e');
+      }
     } finally {
       if (mounted) setState(() => isLoading = false);
     }
   }
 
-  Future<void> forgotPassword(BuildContext context) async {
-    if (emailCtrl.text.isNotEmpty) {
-      try {
-        await FirebaseAuth.instance.sendPasswordResetEmail(email: emailCtrl.text.trim());
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Password reset email sent!")));
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Failed to send reset email")));
+  Future<void> forgotPassword() async {
+    final email = emailCtrl.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Enter your email to reset password")),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Password reset email sent!")),
+        );
+      } else {
+        // ignore: avoid_print
+        print('Password reset email sent (unmounted)');
       }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Enter your email to reset password")));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to send reset email")),
+        );
+      } else {
+        // ignore: avoid_print
+        print('Failed to send reset email: $e');
+      }
     }
   }
 
@@ -123,7 +196,6 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(
         title: const Text("Login"),
         backgroundColor: Colors.deepPurple,
-        elevation: 0,
       ),
       body: Container(
         width: double.infinity,
@@ -138,91 +210,80 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Center(
           child: SingleChildScrollView(
             child: Card(
-              elevation: 8,
+              elevation: 10,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(20),
               ),
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withOpacity(0.95),
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.pets, size: 64, color: Colors.deepPurple),
+                    const Icon(Icons.pets, size: 70, color: Colors.deepPurple),
                     const SizedBox(height: 24),
                     TextField(
                       controller: emailCtrl,
                       decoration: const InputDecoration(
-                        labelText: "Email / Username",
-                        prefixIcon: Icon(Icons.email),
+                        labelText: "Email",
+                        prefixIcon: Icon(Icons.email, color: Colors.deepPurple),
+                        border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: passCtrl,
+                      obscureText: true,
                       decoration: const InputDecoration(
                         labelText: "Password",
-                        prefixIcon: Icon(Icons.lock),
+                        prefixIcon: Icon(Icons.lock, color: Colors.deepPurple),
+                        border: OutlineInputBorder(),
                       ),
-                      obscureText: true,
                     ),
                     const SizedBox(height: 24),
-
-                    // Single Login button: admin or pet-lover decided by email/password
-                    if (isLoading)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: CircularProgressIndicator(),
-                      )
-                    else
-                      Column(
-                        children: [
-                          ElevatedButton(
+                    isLoading
+                        ? const CircularProgressIndicator()
+                        : ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.deepPurple,
-                              padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 48, vertical: 14),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              elevation: 6,
                             ),
-                            onPressed: () {
-                              final entered = emailCtrl.text.trim();
-                              final password = passCtrl.text;
-                              // If both email and password match admin defaults → admin dashboard
-                              if (entered.toLowerCase() == _adminEmail.toLowerCase() && password == _adminPassword) {
-                                Navigator.of(context).pushReplacement(
-                                  MaterialPageRoute(builder: (context) => const AdminDashboardPage()),
-                                );
-                              } else {
-                                login(context);
-                              }
-                            },
+                            onPressed: login,
                             child: const Text(
                               "Login",
-                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white),
                             ),
                           ),
-                        ],
-                      ),
                     const SizedBox(height: 16),
-
-                    // Forgot password + Register row
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         TextButton(
-                          onPressed: () => forgotPassword(context),
-                          child: const Text("Forgot Password?", style: TextStyle(color: Colors.deepPurple)),
+                          onPressed: forgotPassword,
+                          child: const Text(
+                            "Forgot Password?",
+                            style: TextStyle(color: Colors.deepPurple),
+                          ),
                         ),
-                        const SizedBox(width: 16),
                         TextButton(
                           onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const RegisterScreen()),
                             );
                           },
-                          child: const Text("Register", style: TextStyle(color: Colors.teal)),
+                          child: const Text(
+                            "Register",
+                            style: TextStyle(color: Colors.teal),
+                          ),
                         ),
                       ],
                     ),

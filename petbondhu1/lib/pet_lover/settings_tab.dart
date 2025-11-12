@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
 import '../login_screen.dart';
 import '../main.dart';
 import 'my_pets_page.dart';
@@ -17,10 +19,12 @@ class SettingsTab extends StatefulWidget {
 class _SettingsTabState extends State<SettingsTab> {
   String name = 'Demo User';
   String email = '';
-  String photoUrl = '';
+  String photoUrl = ''; // may contain network URL or a data URL (base64)
   late String role;
   bool notificationsEnabled = true;
   bool _loading = true;
+
+  String? _pickedPhotoDataUrl; // temporary picked image as data URL while editing
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -55,9 +59,44 @@ class _SettingsTabState extends State<SettingsTab> {
                 decoration: const InputDecoration(labelText: 'Email (read-only)'),
                 readOnly: true,
               ),
-              TextField(
-                controller: photoCtrl,
-                decoration: const InputDecoration(labelText: 'Photo URL'),
+              // Photo selector: allow picking from gallery and preview
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundImage: _pickedPhotoDataUrl != null
+                        ? MemoryImage(base64Decode(_pickedPhotoDataUrl!.split(',').last)) as ImageProvider
+                        : (photoUrl.isNotEmpty && photoUrl.startsWith('data:')
+                            ? MemoryImage(base64Decode(photoUrl.split(',').last))
+                            : (photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null)),
+                    child: (photoUrl.isEmpty && _pickedPhotoDataUrl == null) ? const Icon(Icons.person) : null,
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      // pick image from gallery, convert to base64 data URL and show preview
+                      final ImagePicker picker = ImagePicker();
+                      final XFile? file = await picker.pickImage(
+                        source: ImageSource.gallery,
+                        maxWidth: 1024,
+                        maxHeight: 1024,
+                        imageQuality: 80,
+                      );
+                      if (file == null) return;
+                      final bytes = await file.readAsBytes();
+                      final mime = file.mimeType ?? 'image/jpeg';
+                      final b64 = base64Encode(bytes);
+                      final dataUrl = 'data:$mime;base64,$b64';
+                      setState(() {
+                        _pickedPhotoDataUrl = dataUrl;
+                        photoCtrl.text = dataUrl; // reflect in the controller if needed
+                      });
+                    },
+                    icon: const Icon(Icons.photo_library),
+                    label: const Text('Pick from gallery'),
+                  ),
+                ],
               ),
               DropdownButtonFormField<String>(
                 value: role,
@@ -73,36 +112,42 @@ class _SettingsTabState extends State<SettingsTab> {
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () async {
-              // Save to Firestore under collection `settings/{uid}`
-              final user = _auth.currentUser;
-              if (user == null) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not signed in')));
-                return;
-              }
-              final docRef = _firestore.collection('settings').doc(user.uid);
-              try {
-                await docRef.set({
-                  'name': nameCtrl.text.trim(),
-                  'photoUrl': photoCtrl.text.trim(),
-                  'role': role,
-                  'email': email,
-                }, SetOptions(merge: true));
+              TextButton(
+                onPressed: () async {
+                  // Save to Firestore under collection `settings/{uid}` with field name `photoURL`
+                  final user = _auth.currentUser;
+                  if (user == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Not signed in')));
+                    return;
+                  }
 
-                setState(() {
-                  name = nameCtrl.text.trim();
-                  photoUrl = photoCtrl.text.trim();
-                });
+                  final docRef = _firestore.collection('settings').doc(user.uid);
+                  try {
+                    // prefer the newly picked data URL, otherwise use whatever is in photoCtrl
+                    final dataUrlToSave = _pickedPhotoDataUrl ?? (photoCtrl.text.trim().isNotEmpty ? photoCtrl.text.trim() : null);
 
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
-                Navigator.pop(context);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save profile: $e')));
-              }
-            },
-            child: const Text('Save'),
-          ),
+                    final Map<String, Object?> payload = {
+                      'name': nameCtrl.text.trim(),
+                      'role': role,
+                      'email': email,
+                    };
+                    if (dataUrlToSave != null) payload['photoURL'] = dataUrlToSave;
+
+                    await docRef.set(payload, SetOptions(merge: true));
+
+                    setState(() {
+                      name = nameCtrl.text.trim();
+                      if (dataUrlToSave != null) photoUrl = dataUrlToSave;
+                    });
+
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
+                    Navigator.pop(context);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save profile: $e')));
+                  }
+                },
+                child: const Text('Save'),
+              ),
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Cancel'),
@@ -170,7 +215,8 @@ class _SettingsTabState extends State<SettingsTab> {
         final data = doc.data()!;
         setState(() {
           name = (data['name'] as String?) ?? name;
-          photoUrl = (data['photoUrl'] as String?) ?? photoUrl;
+          // support both legacy 'photoUrl' and new 'photoURL' fields
+          photoUrl = (data['photoURL'] as String?) ?? (data['photoUrl'] as String?) ?? photoUrl;
           role = (data['role'] as String?) ?? role;
         });
       }
@@ -212,9 +258,13 @@ class _SettingsTabState extends State<SettingsTab> {
                 child: Column(
                   children: [
                     CircleAvatar(
-                      radius: 48,
-                      backgroundImage: photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                      child: photoUrl.isEmpty ? const Icon(Icons.person, size: 48) : null,
+            radius: 48,
+            backgroundImage: photoUrl.isNotEmpty
+              ? (photoUrl.startsWith('data:')
+                ? MemoryImage(base64Decode(photoUrl.split(',').last))
+                : NetworkImage(photoUrl))
+              : null,
+            child: photoUrl.isEmpty ? const Icon(Icons.person, size: 48) : null,
                     ),
                     const SizedBox(height: 16),
                     Text(name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),

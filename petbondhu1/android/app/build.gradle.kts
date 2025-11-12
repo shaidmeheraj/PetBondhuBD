@@ -40,6 +40,10 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Disable code shrinking / R8 for now to avoid missing-class issues with
+            // TensorFlow Lite GPU native artifacts while we sort dependency versions.
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

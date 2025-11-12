@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <title>PetBondhuBD</title>
+
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/png" href="icons/Icon-192.png" />
+
+    <!-- Flutter bootloader (loads main.dart.js) -->
+    <script defer src="flutter.js"></script>
+
+    <!-- TensorFlow.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+
+    <!-- Firebase (Only if JS needs to write to Firestore) -->
+    <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <!-- Your interop -->
+    <script defer src="tf_model.js"></script>
+  </head>
+  <body>
+    <script>
+      // Wait for Flutter to finish loading and then run the app
+      window.addEventListener('load', function () {
+        _flutter.loader
+          .loadEntrypoint({ serviceWorker: { serviceWorkerVersion: null } })
+          .then(engine => engine.initializeEngine())
+          .then(app => app.runApp());
+      });
+
+      // Function to load TensorFlow.js model
+        async function loadModel() {
+          console.log("Loading model...");
+          // First fetch the model.json and inspect it to avoid calling loadLayersModel on an invalid file
+          try {
+            const resp = await fetch('/web/web_model/model.json', { method: 'GET' });
+            if (!resp.ok) {
+              console.warn('No web_model/model.json found (status=' + resp.status + '), skipping TF.js loader');
+              return;
+            }
+            let json;
+            try {
+              json = await resp.json();
+            } catch (e) {
+              console.warn('web_model/model.json is not valid JSON, skipping TF.js loader', e);
+              return;
+            }
+
+            // Heuristic checks: layers-model usually has 'format' === 'layers-model' or modelTopology with 'keras_version'
+            const looksLikeLayers = json['format'] === 'layers-model' || (json['modelTopology'] && json['modelTopology']['keras_version']);
+            const looksLikeGraph = json['modelTopology'] && (json['modelTopology']['node'] || json['modelTopology']['version']);
+
+            if (looksLikeLayers) {
+              try {
+                console.log('Detected TF.js LayersModel in model.json, loading via tf.loadLayersModel');
+                const model = await tf.loadLayersModel('/web/web_model/model.json');
+                console.log("Model loaded");
+                // Example prediction (replace with actual image tensor from Flutter)
+                const input = tf.randomNormal([1, 224, 224, 3]);  // Replace this with actual image input
+                const prediction = model.predict(input);
+                prediction.print();
+                return prediction;
+              } catch (eLayers) {
+                console.warn('Failed to load LayersModel:', eLayers);
+                // continue to try graph below
+              }
+            }
+
+            if (looksLikeGraph) {
+              try {
+                console.log('Detected TF.js GraphModel in model.json, loading via tf.loadGraphModel');
+                const model = await tf.loadGraphModel('/web/web_model/model.json');
+                console.log("Model loaded");
+                // Example prediction (replace with actual image tensor from Flutter)
+                const input = tf.randomNormal([1, 224, 224, 3]);  // Replace this with actual image input
+                const prediction = model.predict(input);
+                prediction.print();
+                return prediction;
+              } catch (eGraph) {
+                console.warn('Failed to load GraphModel:', eGraph);
+              }
+            }
+
+            console.warn('model.json present but does not appear to be a compatible TF.js Layers/Graph model, skipping TF.js loader and falling back to TFLite');
+            return;
+          } catch (err) {
+            console.warn('Error while checking web_model/model.json:', err);
+            return;
+          }
+        }
+
+      // Example function for interacting with Firestore
+      async function savePredictionToFirestore(prediction) {
+        const db = firebase.firestore();
+        const docRef = await db.collection("predictions").add({
+          prediction_class: prediction.predictedClass,
+          prediction_prob: prediction.topProb,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        console.log("Prediction saved to Firestore with doc id:", docRef.id);
+      }
+    </script>
+  </body>
+</html>

@@ -58,11 +58,11 @@ class AdminTipsKnowledgeHubPage extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.deepPurple,
-        child: const Icon(Icons.add),
         onPressed: () {
           // Add new article/tip/video logic here
         },
         tooltip: 'নতুন Article/Tip/Video Add করুন',
+        child: const Icon(Icons.add),
       ),
     );
   }

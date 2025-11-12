@@ -50,11 +50,11 @@ class AdminEmergencyContactManagementPage extends StatelessWidget {
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.deepPurple,
-        child: const Icon(Icons.add),
         onPressed: () {
           // Add new vet/clinic info logic here
         },
         tooltip: 'নতুন Vet/Clinic Add করুন',
+        child: const Icon(Icons.add),
       ),
     );
   }

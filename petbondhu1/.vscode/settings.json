@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "E:/GitHub/PetBondhuBD/petbondhu1/linux"
+    "cmake.sourceDirectory": "E:/GitHub/PetBondhuBD/petbondhu1/linux",
+    "java.configuration.updateBuildConfiguration": "interactive"
 }
