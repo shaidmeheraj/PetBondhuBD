@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 import 'emergency_contact_page.dart';
 import 'community_forum_page.dart';
 import 'adoption_petshop_page.dart';
@@ -23,7 +22,6 @@ class DashboardMain extends StatefulWidget {
 class _DashboardMainState extends State<DashboardMain> {
   int _selectedIndex = 0;
   late final List<Widget> _pages;
-  final PageController _petCarouselController = PageController(viewportFraction: 0.78);
 
   @override
   void initState() {
@@ -111,12 +109,12 @@ class DashboardHome extends StatefulWidget {
 }
 
 class _DashboardHomeState extends State<DashboardHome> {
-  final PageController _petController = PageController(viewportFraction: 0.82);
+  final PageController _petController = PageController(viewportFraction: 0.84);
   int _petIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  // final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
@@ -124,51 +122,49 @@ class _DashboardHomeState extends State<DashboardHome> {
         elevation: 0,
         title: Text('PetBondhuBD', style: TextStyle(color: Colors.deepPurple.shade700)),
         centerTitle: true,
+        leading: IconButton(
+          icon: Icon(Icons.menu, color: Colors.deepPurple.shade700),
+          onPressed: () {},
+        ),
         actions: [
           IconButton(
             onPressed: () {},
-            icon: const Icon(Icons.notifications_none, color: Colors.black54),
+            icon: const Icon(Icons.search, color: Colors.black54),
           )
         ],
       ),
       body: Column(
         children: [
-          // Header with gradient and welcome
+          // header
           Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             width: double.infinity,
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.deepPurple.shade400, Colors.teal.shade300],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+              gradient: LinearGradient(colors: [Colors.deepPurple.shade400, Colors.teal.shade300]),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
             child: SafeArea(
               bottom: false,
               child: Row(
                 children: [
-                  CircleAvatar(radius: 36, backgroundColor: Colors.white24, child: const Icon(Icons.pets, color: Colors.white)),
+                  CircleAvatar(radius: 34, backgroundColor: Colors.white24, child: const Icon(Icons.pets, color: Colors.white)),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Welcome back, ${widget.userName} 👋', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text('Welcome back, ${widget.userName}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 6),
-                        const Text('Your pets are happy to see you today', style: TextStyle(color: Colors.white70)),
+                        const Text('Explore your pets and options', style: TextStyle(color: Colors.white70)),
                       ],
                     ),
                   ),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.deepPurple),
-                    onPressed: () {
-                      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FindDiseasePage()));
-                    },
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FindDiseasePage())),
                     icon: const Icon(Icons.biotech_outlined),
                     label: const Text('Check Health'),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -176,23 +172,23 @@ class _DashboardHomeState extends State<DashboardHome> {
 
           const SizedBox(height: 14),
 
-          // Animated stats row
+          // small stats row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 _StatCard(icon: Icons.verified, title: 'Vaccinated', value: '3'),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 _StatCard(icon: Icons.favorite, title: 'Wellness', value: 'Good'),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 _StatCard(icon: Icons.event, title: 'Appointments', value: '1'),
               ],
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Pet carousel
+          // pet carousel
           SizedBox(
             height: 170,
             child: PageView.builder(
@@ -200,34 +196,36 @@ class _DashboardHomeState extends State<DashboardHome> {
               itemCount: 3,
               onPageChanged: (i) => setState(() => _petIndex = i),
               itemBuilder: (context, index) {
+                final names = ['Bella', 'Charlie', 'Milo'];
                 final colors = [Colors.orange.shade100, Colors.green.shade100, Colors.pink.shade100];
-                final petNames = ['Bella', 'Charlie', 'Milo'];
                 return Transform.scale(
-                  scale: _petIndex == index ? 1 : 0.94,
+                  scale: _petIndex == index ? 1 : 0.96,
                   child: Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     child: Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), color: colors[index % colors.length]),
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), color: colors[index % colors.length]),
                       child: Row(
                         children: [
-                          ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset('assets/pet${index + 1}.jpg', width: 110, height: 110, fit: BoxFit.cover)),
+                          // placeholder image block so no external assets required
+                          Container(
+                            width: 110,
+                            height: 110,
+                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6)]),
+                            child: const Icon(Icons.pets, size: 56, color: Colors.deepPurple),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(petNames[index], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                Text(names[index], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 6),
                                 const Text('Last fed: Today • Walk: 2h ago', style: TextStyle(color: Colors.black54)),
                                 const SizedBox(height: 12),
-                                ElevatedButton(
-                                  onPressed: () {},
-                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
-                                  child: const Text('View Profile'),
-                                ),
+                                Row(children: [ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple), child: const Text('View')), const SizedBox(width: 8), OutlinedButton(onPressed: () {}, child: const Text('Feed'))])
                               ],
                             ),
                           )
@@ -242,7 +240,7 @@ class _DashboardHomeState extends State<DashboardHome> {
 
           const SizedBox(height: 12),
 
-          // Overview / Actions section
+          // actions + overview
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -250,12 +248,12 @@ class _DashboardHomeState extends State<DashboardHome> {
                 physics: const BouncingScrollPhysics(),
                 children: [
                   const Text('Quick Actions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   SizedBox(
                     height: 110,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
-                      children: const [
+                      children: [
                         _ActionCard(title: 'Lost & Found', icon: Icons.location_on, color: Colors.red),
                         _ActionCard(title: 'Emergency', icon: Icons.local_hospital, color: Colors.redAccent),
                         _ActionCard(title: 'Forum', icon: Icons.forum, color: Colors.deepPurple),
@@ -264,16 +262,10 @@ class _DashboardHomeState extends State<DashboardHome> {
                     ),
                   ),
 
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 18),
                   const Text('Overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: const [
-                      Expanded(child: _OverviewCard(icon: Icons.vaccines, title: 'Next Vaccine', color: Colors.orange)),
-                      SizedBox(width: 12),
-                      Expanded(child: _OverviewCard(icon: Icons.fastfood, title: 'Food Log', color: Colors.green)),
-                    ],
-                  ),
+                  const SizedBox(height: 10),
+                  Row(children: const [Expanded(child: _OverviewCard(icon: Icons.vaccines, title: 'Next Vaccine', color: Colors.orange)), SizedBox(width: 12), Expanded(child: _OverviewCard(icon: Icons.fastfood, title: 'Food Log', color: Colors.green))]),
 
                   const SizedBox(height: 18),
                   Card(
@@ -435,26 +427,21 @@ class _OverviewCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: color.withOpacity(0.12),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, color: color, size: 22),
-            ),
+            Icon(icon, color: color, size: 28),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 title,
                 style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  fontWeight: FontWeight.w500,
+                  color: color,
                 ),
               ),
             ),
-            Icon(Icons.chevron_right, color: Colors.grey.shade600)
           ],
         ),
       ),
@@ -462,6 +449,7 @@ class _OverviewCard extends StatelessWidget {
   }
 }
 
+// Small stat card used in the header
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final String title;
@@ -473,15 +461,32 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 4))
-        ]),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 3))],
+        ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: Colors.deepPurple.shade50, borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: Colors.deepPurple)),
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: Colors.deepPurple.shade50, borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: Colors.deepPurple, size: 20),
+            ),
             const SizedBox(width: 10),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(fontSize: 12, color: Colors.black54)), const SizedBox(height: 6), Text(value, style: const TextStyle(fontWeight: FontWeight.bold))])
+            Flexible(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(fontSize: 12, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 4),
+                  Text(value, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            )
           ],
         ),
       ),
@@ -489,6 +494,7 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+// Horizontal action cards
 class _ActionCard extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -502,20 +508,25 @@ class _ActionCard extends StatelessWidget {
       padding: const EdgeInsets.only(right: 12),
       child: Container(
         width: 140,
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 4))]),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 3))],
+        ),
         child: InkWell(
           onTap: () {},
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: color)),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-                const Spacer(),
-                Text('Open', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                const SizedBox(height: 6),
+                Text('Open', style: TextStyle(color: Colors.grey.shade600, fontSize: 12))
               ],
             ),
           ),
