@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'login_screen.dart';
 
 class AdminSettingsProfilePage extends StatelessWidget {
   const AdminSettingsProfilePage({super.key});
@@ -49,8 +51,16 @@ class AdminSettingsProfilePage extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.deepPurple),
               title: const Text('Logout'),
-              onTap: () {
-                // Logout logic here
+              onTap: () async {
+                try {
+                  await FirebaseAuth.instance.signOut();
+                } catch (_) {
+                  // ignore sign-out errors for now
+                }
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
               },
             ),
           ],

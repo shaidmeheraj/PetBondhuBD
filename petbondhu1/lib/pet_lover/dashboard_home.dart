@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'emergency_contact_page.dart';
 import 'community_forum_page.dart';
@@ -111,6 +113,25 @@ class DashboardHome extends StatefulWidget {
 class _DashboardHomeState extends State<DashboardHome> {
   final PageController _petController = PageController(viewportFraction: 0.84);
   int _petIndex = 0;
+  late final Future<List<Map<String, dynamic>>> _petsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _petsFuture = _loadUserPets();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadUserPets() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final db = FirebaseFirestore.instance;
+      if (user == null) return [];
+      final snapshot = await db.collection('pets').where('ownerId', isEqualTo: user.uid).get();
+      return snapshot.docs.map((d) => {'id': d.id, ...d.data() as Map<String, dynamic>}).toList();
+    } catch (e) {
+      return [];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -133,10 +154,12 @@ class _DashboardHomeState extends State<DashboardHome> {
           )
         ],
       ),
-      body: Column(
-        children: [
-          // header
-          Container(
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // header
+            Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             width: double.infinity,
             decoration: BoxDecoration(
@@ -172,95 +195,171 @@ class _DashboardHomeState extends State<DashboardHome> {
 
           const SizedBox(height: 14),
 
-          // small stats row
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _StatCard(icon: Icons.verified, title: 'Vaccinated', value: '3'),
-                const SizedBox(width: 10),
-                _StatCard(icon: Icons.favorite, title: 'Wellness', value: 'Good'),
-                const SizedBox(width: 10),
-                _StatCard(icon: Icons.event, title: 'Appointments', value: '1'),
-              ],
-            ),
+          // small stats row (driven from user's pets)
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _petsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: const [
+                      Expanded(child: _StatCard(icon: Icons.hourglass_top, title: 'Loading', value: '...')),
+                      SizedBox(width: 10),
+                      Expanded(child: _StatCard(icon: Icons.hourglass_top, title: '', value: '')),
+                      SizedBox(width: 10),
+                      Expanded(child: _StatCard(icon: Icons.hourglass_top, title: '', value: '')),
+                    ],
+                  ),
+                );
+              }
+              final pets = snapshot.data ?? [];
+              final vaccinated = pets.where((p) => (p['vaccinated'] == true)).length;
+              final appointments = pets.fold<int>(0, (acc, p) {
+                final list = p['appointments'] as List<dynamic>?;
+                return acc + (list?.length ?? 0);
+              });
+              final wellnessGood = pets.where((p) => (p['wellness'] ?? '').toString().toLowerCase() == 'good').length;
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(child: _StatCard(icon: Icons.verified, title: 'Vaccinated', value: vaccinated.toString())),
+                    const SizedBox(width: 10),
+                    Expanded(child: _StatCard(icon: Icons.favorite, title: 'Wellness Good', value: wellnessGood.toString())),
+                    const SizedBox(width: 10),
+                    Expanded(child: _StatCard(icon: Icons.event, title: 'Appointments', value: appointments.toString())),
+                  ],
+                ),
+              );
+            },
           ),
 
           const SizedBox(height: 14),
 
-          // pet carousel
-          SizedBox(
-            height: 170,
-            child: PageView.builder(
-              controller: _petController,
-              itemCount: 3,
-              onPageChanged: (i) => setState(() => _petIndex = i),
-              itemBuilder: (context, index) {
-                final names = ['Bella', 'Charlie', 'Milo'];
-                final colors = [Colors.orange.shade100, Colors.green.shade100, Colors.pink.shade100];
-                return Transform.scale(
-                  scale: _petIndex == index ? 1 : 0.96,
-                  child: Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), color: colors[index % colors.length]),
-                      child: Row(
-                        children: [
-                          // placeholder image block so no external assets required
-                          Container(
-                            width: 110,
-                            height: 110,
-                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6)]),
-                            child: const Icon(Icons.pets, size: 56, color: Colors.deepPurple),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(names[index], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 6),
-                                const Text('Last fed: Today • Walk: 2h ago', style: TextStyle(color: Colors.black54)),
-                                const SizedBox(height: 12),
-                                Row(children: [ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple), child: const Text('View')), const SizedBox(width: 8), OutlinedButton(onPressed: () {}, child: const Text('Feed'))])
-                              ],
-                            ),
-                          )
-                        ],
+          // pet carousel (loaded from Firestore)
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _petsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const SizedBox(height: 170, child: Center(child: CircularProgressIndicator()));
+              }
+              final pets = snapshot.data ?? [];
+              if (pets.isEmpty) {
+                return SizedBox(
+                  height: 140,
+                  child: Center(
+                    child: Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text('No pets found. Add a pet to get started', style: TextStyle(color: Colors.grey.shade700)),
                       ),
                     ),
                   ),
                 );
-              },
-            ),
+              }
+
+              return SizedBox(
+                height: 170,
+                child: PageView.builder(
+                  controller: _petController,
+                  itemCount: pets.length,
+                  onPageChanged: (i) => setState(() => _petIndex = i),
+                  itemBuilder: (context, index) {
+                    final pet = pets[index];
+                    final name = pet['name']?.toString() ?? 'Pet';
+                    final color = Colors.primaries[index % Colors.primaries.length].shade100;
+                    return Transform.scale(
+                      scale: _petIndex == index ? 1 : 0.96,
+                      child: Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), color: color),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 110,
+                                height: 110,
+                                decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white, boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6)]),
+                                child: const Icon(Icons.pets, size: 56, color: Colors.deepPurple),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 6),
+                                    Text((pet['notes'] ?? 'No recent activity').toString(), style: const TextStyle(color: Colors.black54)),
+                                    const SizedBox(height: 12),
+                                    Row(children: [ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A00F4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10)), child: const Text('View')), const SizedBox(width: 8), OutlinedButton(onPressed: () {}, style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), side: const BorderSide(color: Color(0xFF6A00F4))), child: const Text('Feed'))])
+                                  ],
+                                ),
+                              )
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
           ),
 
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-          // actions + overview
-          Expanded(
-            child: Padding(
+            // actions + overview (non-scrolling inside the page scroll)
+            Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text('Quick Actions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 10),
-                  SizedBox(
-                    height: 110,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _ActionCard(title: 'Lost & Found', icon: Icons.location_on, color: Colors.red),
-                        _ActionCard(title: 'Emergency', icon: Icons.local_hospital, color: Colors.redAccent),
-                        _ActionCard(title: 'Forum', icon: Icons.forum, color: Colors.deepPurple),
-                        _ActionCard(title: 'Adopt & Shop', icon: Icons.store, color: Colors.orange),
-                      ],
-                    ),
-                  ),
+                  Builder(builder: (context) {
+                    // Allow cards to size naturally; no fixed height is used so
+                    // the page scrolls vertically when cards grow (accessibility).
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 4),
+                            _ActionCard(
+                              title: 'Lost & Found',
+                              icon: Icons.location_on,
+                              color: Colors.red,
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdoptionPetShopPage())),
+                            ),
+                            _ActionCard(
+                              title: 'Emergency',
+                              icon: Icons.local_hospital,
+                              color: Colors.redAccent,
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => EmergencyContactPage())),
+                            ),
+                            _ActionCard(
+                              title: 'Forum',
+                              icon: Icons.forum,
+                              color: Colors.deepPurple,
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CommunityForumPage())),
+                            ),
+                            _ActionCard(
+                              title: 'Adopt & Shop',
+                              icon: Icons.store,
+                              color: Colors.orange,
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdoptionPetShopPage())),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ),
+                      );
+                  }),
 
                   const SizedBox(height: 18),
                   const Text('Overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -281,9 +380,9 @@ class _DashboardHomeState extends State<DashboardHome> {
                   const SizedBox(height: 24),
                 ],
               ),
-            ),
-          )
-        ],
+            )
+          ],
+        ),
       ),
     );
   }
@@ -291,122 +390,9 @@ class _DashboardHomeState extends State<DashboardHome> {
 
 // ================== COMPONENTS ==================
 
-// Quick action buttons
-class _LostFoundButton extends StatelessWidget {
-  const _LostFoundButton();
+// (Old quick-circle button helpers removed; use action cards or direct navigation from actions)
 
-  @override
-  Widget build(BuildContext context) {
-    return _QuickCircleButton(
-      icon: Icons.location_on,
-      color: Colors.red,
-      label: "Lost & Found",
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => const AdoptionPetShopPage(),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _EmergencyContactButton extends StatelessWidget {
-  const _EmergencyContactButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return _QuickCircleButton(
-      icon: Icons.local_hospital,
-      color: Colors.red,
-      label: "Emergency",
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => EmergencyContactPage(),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _CommunityForumButton extends StatelessWidget {
-  const _CommunityForumButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return _QuickCircleButton(
-      icon: Icons.forum,
-      color: Colors.deepPurple,
-      label: "Forum",
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => CommunityForumPage(),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _AdoptionPetShopButton extends StatelessWidget {
-  const _AdoptionPetShopButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return _QuickCircleButton(
-      icon: Icons.store,
-      color: Colors.orange,
-      label: "Adoption & Shop",
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => const AdoptionPetShopPage(),
-          ),
-        );
-      },
-    );
-  }
-}
-
-// Reusable Quick Circle Buttons
-class _QuickCircleButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickCircleButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Material(
-          color: color.withOpacity(0.15),
-          shape: const CircleBorder(),
-          child: IconButton(
-            icon: Icon(icon, color: color, size: 30),
-            onPressed: onTap,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          label,
-          style: TextStyle(color: color, fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
-}
+// Quick circle helpers removed — use action cards instead.
 
 // Overview Card for key info
 class _OverviewCard extends StatelessWidget {
@@ -459,36 +445,34 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 3))],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(color: Colors.deepPurple.shade50, borderRadius: BorderRadius.circular(8)),
-              child: Icon(icon, color: Colors.deepPurple, size: 20),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 3))],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: Colors.deepPurple.shade50, borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: Colors.deepPurple, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 12, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 4),
+                Text(value, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+              ],
             ),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontSize: 12, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
-                  Text(value, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            )
-          ],
-        ),
+          )
+        ],
       ),
     );
   }
@@ -499,8 +483,9 @@ class _ActionCard extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color color;
+  final VoidCallback? onTap;
 
-  const _ActionCard({required this.title, required this.icon, required this.color});
+  const _ActionCard({required this.title, required this.icon, required this.color, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -514,7 +499,7 @@ class _ActionCard extends StatelessWidget {
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 3))],
         ),
         child: InkWell(
-          onTap: () {},
+          onTap: onTap ?? () {},
           borderRadius: BorderRadius.circular(12),
           child: Padding(
             padding: const EdgeInsets.all(12),
