@@ -12,6 +12,8 @@ import 'chatbot_page.dart';
 import 'pet_care_hub.dart';
 import '../main.dart';
 import 'my_pets_page.dart';
+import 'lost_pet_page.dart';
+import 'found_pet_page.dart';
 
 // ================= MAIN DASHBOARD WITH NAVBAR ====================
 class DashboardMain extends StatefulWidget {
@@ -606,6 +608,8 @@ class _DashboardHomeState extends State<DashboardHome> {
                         _QuickAction(title: 'Adopt', icon: Icons.pets, color: Colors.teal, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdoptionPage()))),
                         _QuickAction(title: 'Pet Shop', icon: Icons.storefront, color: Colors.orange, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PetShopPage()))),
                         _QuickAction(title: 'Care Hub', icon: Icons.health_and_safety, color: Colors.indigo, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PetCareHub()))),
+                        _QuickAction(title: 'Lost Pet', icon: Icons.search, color: Colors.red, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LostPetPage()))),
+                        _QuickAction(title: 'Found Pet', icon: Icons.favorite, color: Colors.green, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FoundPetPage()))),
                       ];
                       // target small square buttons ~72px, wrap to multiple rows if needed
                         final double spacing = 10;

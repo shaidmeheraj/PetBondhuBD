@@ -1,0 +1,250 @@
+<!--
+Simple single-file HTML UI for Pet Disease Classifier
+- Save this file as `pet_disease_ui.html`
+- Start your FastAPI backend: uvicorn main:app --host 0.0.0.0 --port 8000
+- Serve this HTML from a local server (recommended):
+    python -m http.server 5500
+  then open http://localhost:5500/pet_disease_ui.html
+- If your backend runs on a different host/port, change BACKEND_URL below.
+-->
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pet Disease Classifier — UI</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--muted:#9aa7b2;--accent:#6ee7b7;--glass:rgba(255,255,255,0.03)}
+    html,body{height:100%;margin:0;font-family:Inter,ui-sans-serif,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial}
+    body{background:linear-gradient(180deg,#071021 0%, #07182a 60%);color:#e6f0f2;display:flex;align-items:center;justify-content:center;padding:28px}
+    .app{width:100%;max-width:980px}
+    .header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+    .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#0ea5a6,#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700}
+    .title h1{margin:0;font-size:20px} .title p{margin:0;color:var(--muted);font-size:13px}
+
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:18px}
+    .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 6px 20px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.02)}
+
+    /* Left column */
+    .upload-area{display:flex;flex-direction:column;gap:12px}
+    .preview{height:360px;border-radius:10px;background:var(--glass);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+    .preview img{max-width:100%;max-height:100%;object-fit:contain}
+    .controls{display:flex;gap:10px;align-items:center}
+    .btn{background:linear-gradient(90deg,#06b6d4,#7c3aed);border:none;color:white;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+    .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+    .file-input{display:none}
+
+    .meta{display:flex;gap:12px;flex-wrap:wrap}
+    .meta .small{background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;color:var(--muted);font-size:13px}
+
+    /* Right column */
+    .result-list{display:flex;flex-direction:column;gap:12px}
+    .result-top{display:flex;align-items:center;justify-content:space-between}
+    .pill{background:rgba(255,255,255,0.03);padding:8px 10px;border-radius:999px;color:var(--muted);font-size:13px}
+    .prediction{font-size:20px;font-weight:700;color:var(--accent)}
+
+    .topk{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    .topk-item{display:flex;align-items:center;gap:10px}
+    .bar{height:10px;background:rgba(255,255,255,0.06);border-radius:999px;flex:1;overflow:hidden}
+    .bar > i{display:block;height:100%;background:linear-gradient(90deg,#34d399,#06b6d4);border-radius:999px}
+
+    .info{font-size:13px;color:var(--muted);margin-top:10px}
+
+    .footer{margin-top:14px;color:var(--muted);font-size:13px}
+
+    /* responsiveness */
+    @media (max-width:920px){.grid{grid-template-columns:1fr;}.preview{height:280px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div class="logo">PB</div>
+      <div class="title">
+        <h1>Pet Disease Classifier</h1>
+        <p>Upload a pet image and get predicted disease labels (TFLite backend)</p>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT: upload & preview -->
+      <div class="card">
+        <div class="upload-area">
+          <div class="preview" id="preview">
+            <div id="preview-placeholder">
+              <svg width="120" height="120" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3v10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+                <path d="M5 12h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+              </svg>
+              <div style="color:var(--muted);margin-top:10px">No image selected — click "Choose Image"</div>
+            </div>
+          </div>
+
+          <div class="controls">
+            <label class="btn" for="file">Choose Image</label>
+            <input id="file" class="file-input" type="file" accept="image/*">
+            <button id="predictBtn" class="btn ghost">Predict</button>
+            <button id="clearBtn" class="btn ghost">Clear</button>
+          </div>
+
+          <div class="meta">
+            <div class="small">Supported: JPEG / PNG / WEBP</div>
+            <div class="small">Max: depends on backend</div>
+            <div class="small" id="backendInfo">Backend: <span id="backendUrlText">http://localhost:8000</span></div>
+          </div>
+
+          <div class="footer">Tip: Serve this file via a local HTTP server (python -m http.server) to avoid browser file-origin issues.</div>
+        </div>
+      </div>
+
+      <!-- RIGHT: results -->
+      <div class="card">
+        <div class="result-list">
+          <div class="result-top">
+            <div class="pill">Status: <span id="status">idle</span></div>
+            <div class="pill">Model: <span id="modelShape">-</span></div>
+          </div>
+
+          <div style="margin-top:10px">
+            <div style="color:var(--muted);font-size:13px">Prediction</div>
+            <div class="prediction" id="predicted">—</div>
+            <div style="color:var(--muted);font-size:13px;margin-top:6px">Confidence: <span id="confidence">—</span></div>
+
+            <div class="topk" id="topk"></div>
+          </div>
+
+          <div class="info" id="extraInfo"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ======= CONFIG =======
+    // Change this if your backend runs on a different host/port
+    const BACKEND_URL = 'http://localhost:8000';
+    document.getElementById('backendUrlText').innerText = BACKEND_URL;
+
+    const fileInput = document.getElementById('file');
+    const preview = document.getElementById('preview');
+    const previewPlaceholder = document.getElementById('preview-placeholder');
+    const predictBtn = document.getElementById('predictBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const statusSpan = document.getElementById('status');
+    const predictedEl = document.getElementById('predicted');
+    const confidenceEl = document.getElementById('confidence');
+    const topkEl = document.getElementById('topk');
+    const modelShapeEl = document.getElementById('modelShape');
+    const extraInfo = document.getElementById('extraInfo');
+
+    let selectedFile = null;
+
+    // fetch model info on load
+    async function fetchModelInfo(){
+      try{
+        const r = await fetch(BACKEND_URL + '/');
+        if(!r.ok) throw new Error('Could not fetch model info');
+        const j = await r.json();
+        modelShapeEl.innerText = `${j.model_info.height}×${j.model_info.width}×${j.model_info.channels} (${j.model_info.dtype})`;
+      }catch(err){
+        modelShapeEl.innerText = 'not available';
+      }
+    }
+
+    fetchModelInfo();
+
+    fileInput.addEventListener('change', (ev)=>{
+      const f = ev.target.files && ev.target.files[0];
+      if(!f) return;
+      selectedFile = f;
+      showPreview(f);
+    });
+
+    function showPreview(file){
+      const url = URL.createObjectURL(file);
+      previewPlaceholder && previewPlaceholder.remove();
+      // remove old img
+      const old = preview.querySelector('img'); if(old) old.remove();
+      const img = document.createElement('img'); img.src = url; img.onload = ()=>URL.revokeObjectURL(url);
+      preview.appendChild(img);
+    }
+
+    clearBtn.addEventListener('click', ()=>{
+      selectedFile = null;
+      fileInput.value = '';
+      topkEl.innerHTML = '';
+      predictedEl.innerText = '—';
+      confidenceEl.innerText = '—';
+      statusSpan.innerText = 'idle';
+      extraInfo.innerText = '';
+      const img = preview.querySelector('img'); if(img) img.remove();
+      if(!document.getElementById('preview-placeholder')){
+        const ph = document.createElement('div'); ph.id='preview-placeholder'; ph.innerHTML = `\n              <svg width="120" height="120" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n                <path d="M12 3v10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>\n                <path d="M5 12h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>\n              </svg>\n              <div style="color:var(--muted);margin-top:10px">No image selected — click "Choose Image"</div>`;
+        preview.appendChild(ph);
+      }
+    });
+
+    predictBtn.addEventListener('click', async ()=>{
+      if(!selectedFile){
+        alert('Please choose an image first.');
+        return;
+      }
+
+      statusSpan.innerText = 'uploading...';
+      predictedEl.innerText = '—'; confidenceEl.innerText='—'; topkEl.innerHTML=''; extraInfo.innerText='';
+
+      const fd = new FormData();
+      fd.append('file', selectedFile, selectedFile.name);
+
+      try{
+        const r = await fetch(BACKEND_URL + '/predict', {
+          method: 'POST', body: fd
+        });
+
+        if(!r.ok){
+          const txt = await r.text();
+          throw new Error(`Server error ${r.status}: ${txt}`);
+        }
+
+        const j = await r.json();
+        // expected: {predicted_disease, confidence, top_k}
+        statusSpan.innerText = 'done';
+        predictedEl.innerText = j.predicted_disease || '—';
+        confidenceEl.innerText = j.confidence ? (Math.round(j.confidence*10000)/100).toString() + '%' : '—';
+
+        // top_k could be array of {label, confidence}
+        if(Array.isArray(j.top_k)){
+          topkEl.innerHTML = '';
+          j.top_k.forEach(item=>{
+            const row = document.createElement('div'); row.className='topk-item';
+            const label = document.createElement('div'); label.style.width='140px'; label.style.fontSize='14px'; label.style.color='var(--muted)'; label.innerText = item.label;
+            const barWrap = document.createElement('div'); barWrap.className='bar';
+            const bar = document.createElement('i');
+            const conf = (item.confidence||0);
+            bar.style.width = Math.max(2, Math.round(conf*100)) + '%';
+            barWrap.appendChild(bar);
+            const confText = document.createElement('div'); confText.style.width='56px'; confText.style.textAlign='right'; confText.style.fontSize='13px'; confText.style.color='var(--muted)'; confText.innerText = conf ? (Math.round(conf*10000)/100).toString() + '%' : '';
+            row.appendChild(label); row.appendChild(barWrap); row.appendChild(confText);
+            topkEl.appendChild(row);
+          });
+        }
+
+        if(j.top_k && j.top_k.length>0) extraInfo.innerText = `Top label: ${j.top_k[0].label}`;
+      }catch(err){
+        statusSpan.innerText = 'error';
+        extraInfo.innerText = 'Error: ' + (err.message || err);
+        console.error(err);
+      }
+    });
+
+    // allow clicking the custom button to open file selector
+    document.querySelector('label[for=file]').addEventListener('click', ()=>fileInput.click());
+
+    // small UX: allow drop
+    preview.addEventListener('dragover', (e)=>{e.preventDefault(); preview.style.outline='2px dashed rgba(255,255,255,0.04)'});
+    preview.addEventListener('dragleave', (e)=>{preview.style.outline='none'});
+    preview.addEventListener('drop', (e)=>{e.preventDefault(); preview.style.outline='none';const f = e.dataTransfer.files && e.dataTransfer.files[0]; if(f){selectedFile=f; fileInput.files = e.dataTransfer.files; showPreview(f);} });
+  </script>
+</body>
+</html>

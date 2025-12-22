@@ -284,7 +284,7 @@ class _SettingsTabState extends State<SettingsTab> {
                       onPressed: _editProfile,
                       icon: const Icon(Icons.edit),
                       label: const Text('Edit Profile'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.deepPurple),
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 25, 25, 26)),
                     ),
                   ],
                 ),
@@ -408,3 +408,5 @@ class _SettingsTabState extends State<SettingsTab> {
     );
   }
 }
+
+ 

@@ -4,8 +4,9 @@ import 'admin_settings_profile_page.dart';
 import 'admin_emergency_contact_management_page.dart';
 import 'admin_community_forum_control_page.dart';
 import 'admin_tips_knowledge_hub_page.dart';
-import 'admin_adoption_petshop_management_page.dart';
-import 'admin_lost_found_management_page.dart';
+// import 'admin_adoption_petshop_management_page.dart'; // legacy combined page (optional, kept commented to avoid unused import)
+import 'admin_adoption_management_page.dart';
+import 'admin_petshop_management_page.dart';
 import 'admin_pet_profile_management_page.dart';
 import 'admin_user_management_page.dart';
 
@@ -170,15 +171,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         'label': 'Pet & Profile Management',
         'page': const AdminPetProfileManagementPage(),
       },
+      // Split adoption & pet shop management into two distinct pages
       {
-        'icon': Icons.location_on,
-        'label': 'Lost & Found Management',
-        'page': const AdminLostFoundManagementPage(),
+        'icon': Icons.pets,
+        'label': 'Adoption Posts Management',
+        'page': const AdminAdoptionManagementPage(),
       },
       {
         'icon': Icons.store,
-        'label': 'Adoption & Pet Shop Management',
-        'page': const AdminAdoptionPetShopManagementPage(),
+        'label': 'Pet Shop Products Management',
+        'page': const AdminPetShopManagementPage(),
       },
       {
         'icon': Icons.menu_book,
