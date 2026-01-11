@@ -5,9 +5,11 @@
 
 import io
 import os
+from pyexpat.errors import messages
 import threading
 from contextlib import asynccontextmanager
 from typing import List
+from urllib import response
 
 import numpy as np
 from PIL import Image
@@ -36,7 +38,7 @@ LABELS_PATH = os.getenv("LABELS_PATH", "assets/labels.txt")
 TOP_K = int(os.getenv("TOP_K", "5"))
 
 # Groq settings (use env var)
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", os.getenv("GROQ_API_KEY_INLINE", "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"))
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", os.getenv("GROQ_API_KEY_INLINE", "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"))
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 
 # -------------------------------------------------------------------
@@ -124,8 +126,10 @@ async def lifespan(app: FastAPI):
             message: list
 
         def chatbot_node(state: ChatBotState):
-            # llm.invoke is expected to return or produce a response object; adapt if API differs
-            return {"message": [llm.invoke(state["message"])]}
+            messages = state["message"]          # keep history
+            response = llm.invoke(messages)      # AIMessage
+            return {"message": messages + [response]}
+
 
         graph = StateGraph(ChatBotState)
         graph.add_node("chatbot", chatbot_node)
@@ -288,18 +292,19 @@ def chat_api(req: ChatRequest):
     if chat_bot is None:
         raise HTTPException(status_code=503, detail="Chatbot not available")
 
-    # Build the message state for the graph (LangGraph expects list of messages)
     try:
-        response = chat_bot.invoke(
+        result = chat_bot.invoke(
             {"message": [HumanMessage(content=req.text)]},
-            config={"configurable": {"thread_id": 1}},
+            config={"configurable": {"thread_id": os.urandom(8).hex()}},
         )
-        # Response structure in your original code: response["message"][-1].content
-        reply_obj = response.get("message", [])[-1]
-        reply_text = getattr(reply_obj, "content", None) or str(reply_obj)
+
+        reply_text = result["message"][-1].content
         return {"reply": reply_text}
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Chatbot error: {e}")
+        print("CHAT ERROR:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 # -------------------------------------------------------------------
