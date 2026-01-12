@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'login_screen.dart';
+import 'package:petbondhu1/login_screen.dart';
 
 class AdminSettingsProfilePage extends StatelessWidget {
   const AdminSettingsProfilePage({super.key});

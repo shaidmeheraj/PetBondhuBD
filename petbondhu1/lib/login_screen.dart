@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'admin_dashboard_page.dart';
+import 'package:petbondhu1/admin/admin_dashboard_page.dart';
 import 'pet_lover/dashboard_home.dart';
 import 'register_screen.dart';
 

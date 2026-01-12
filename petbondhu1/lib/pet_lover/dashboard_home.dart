@@ -15,6 +15,19 @@ import 'my_pets_page.dart';
 import 'lost_pet_page.dart';
 import 'found_pet_page.dart';
 
+class _PetPalette {
+  static const Color primary = Color(0xFF6750A4);
+  static const Color secondary = Color(0xFF2AB3A6);
+  static const Color accent = Color(0xFFFFB74D);
+  static const Color surface = Color(0xFFF5F3FF);
+  static const List<List<Color>> gradients = [
+    [Color(0xFF6750A4), Color(0xFF2AB3A6)],
+    [Color(0xFF4F8EF8), Color(0xFF7BD1EA)],
+    [Color(0xFFFF8A65), Color(0xFFFFD54F)],
+    [Color(0xFF8E24AA), Color(0xFF9575CD)],
+  ];
+}
+
 // ================= MAIN DASHBOARD WITH NAVBAR ====================
 class DashboardMain extends StatefulWidget {
   final String userName;
@@ -69,35 +82,45 @@ class _DashboardMainState extends State<DashboardMain> {
       
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
-          indicatorColor: Colors.deepPurple.shade100,
-          labelTextStyle: MaterialStateProperty.all(
-            const TextStyle(fontWeight: FontWeight.w600),
+          indicatorColor: _PetPalette.primary.withOpacity(32 / 255),
+          labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => TextStyle(
+              fontWeight: FontWeight.w700,
+              color: states.contains(WidgetState.selected) ? _PetPalette.primary : Colors.black54,
+            ),
+          ),
+          iconTheme: WidgetStateProperty.resolveWith(
+            (states) => IconThemeData(
+              color: states.contains(WidgetState.selected) ? _PetPalette.primary : Colors.black38,
+              size: states.contains(WidgetState.selected) ? 26 : 24,
+            ),
           ),
         ),
         child: NavigationBar(
+          height: 72,
           backgroundColor: Colors.white,
-          elevation: 5,
+          elevation: 10,
           selectedIndex: _selectedIndex,
           onDestinationSelected: _onItemTapped,
           destinations: const [
             NavigationDestination(
-              icon: Icon(Icons.dashboard_outlined),
-              selectedIcon: Icon(Icons.dashboard, color: Colors.deepPurple),
+              icon: Icon(Icons.pets_outlined),
+              selectedIcon: Icon(Icons.pets),
               label: 'Home',
             ),
             NavigationDestination(
-              icon: Icon(Icons.biotech_outlined),
-              selectedIcon: Icon(Icons.biotech, color: Colors.deepPurple),
-              label: 'Find Disease',
+              icon: Icon(Icons.monitor_heart_outlined),
+              selectedIcon: Icon(Icons.monitor_heart),
+              label: 'Care Scan',
             ),
             NavigationDestination(
-              icon: Icon(Icons.chat_bubble_outline),
-              selectedIcon: Icon(Icons.chat_bubble, color: Colors.deepPurple),
-              label: 'Chatbot',
+              icon: Icon(Icons.auto_awesome_outlined),
+              selectedIcon: Icon(Icons.auto_awesome),
+              label: 'PetBot',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),
-              selectedIcon: Icon(Icons.settings, color: Colors.deepPurple),
+              selectedIcon: Icon(Icons.settings),
               label: 'Settings',
             ),
           ],
@@ -160,6 +183,120 @@ class _DashboardHomeState extends State<DashboardHome> {
     } catch (_) {
       // silent; keep defaults
     }
+  }
+
+  String _greeting() {
+    final hour = DateTime.now().hour;
+    final salutation = hour < 12
+        ? 'Good morning'
+        : hour < 17
+            ? 'Good afternoon'
+            : 'Good evening';
+    return '$salutation, $_name';
+  }
+
+  IconData _roleIcon() {
+    switch (_role.toLowerCase()) {
+      case 'admin':
+        return Icons.verified_user;
+      case 'shop owner':
+        return Icons.store_mall_directory;
+      default:
+        return Icons.favorite;
+    }
+  }
+
+  LinearGradient _heroGradient(int seed) {
+    final bucket = DateTime.now().hour ~/ 6;
+    final paletteIndex = (bucket + seed) % _PetPalette.gradients.length;
+    final colors = _PetPalette.gradients[paletteIndex];
+    return LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight);
+  }
+
+  Map<String, int> _computeMetrics(List<Map<String, dynamic>> pets) {
+    final vaccinated = pets.where((p) => (p['vaccinated'] == true)).length;
+    final appointments = pets.fold<int>(0, (acc, p) {
+      final list = p['appointments'] as List<dynamic>?;
+      return acc + (list?.length ?? 0);
+    });
+    final wellnessGood = pets.where((p) => (p['wellness'] ?? '').toString().toLowerCase() == 'good').length;
+    return {
+      'total': pets.length,
+      'vaccinated': vaccinated,
+      'appointments': appointments,
+      'wellness': wellnessGood,
+    };
+  }
+
+  List<_SuggestionData> _generateSuggestions(List<Map<String, dynamic>> pets) {
+    final metrics = _computeMetrics(pets);
+    final total = metrics['total'] ?? 0;
+    final vaccinated = metrics['vaccinated'] ?? 0;
+    final appointments = metrics['appointments'] ?? 0;
+    final wellness = metrics['wellness'] ?? 0;
+
+    final suggestions = <_SuggestionData>[];
+
+    if (total == 0) {
+      suggestions.addAll(const [
+        _SuggestionData(
+          title: 'Add your first pet',
+          subtitle: 'Create a profile to unlock personalized reminders and nutrition plans.',
+          icon: Icons.assignment_turned_in,
+          color: Color(0xFF81C784),
+        ),
+        _SuggestionData(
+          title: 'Explore adoption stories',
+          subtitle: 'Meet pets waiting for a new home and mark your favorites.',
+          icon: Icons.volunteer_activism,
+          color: Color(0xFF9575CD),
+        ),
+      ]);
+      return suggestions;
+    }
+
+    if (vaccinated < total) {
+      suggestions.add(const _SuggestionData(
+        title: 'Vaccination follow-up',
+        subtitle: 'Log the latest vaccine doses and set reminders for boosters.',
+        icon: Icons.vaccines,
+        color: Color(0xFFFFA726),
+      ));
+    }
+
+    if (appointments == 0) {
+      suggestions.add(const _SuggestionData(
+        title: 'Schedule a vet check',
+        subtitle: 'Routine wellness visits help spot issues earlier and keep insurance valid.',
+        icon: Icons.calendar_month,
+        color: Color(0xFF4FC3F7),
+      ));
+    }
+
+    if (wellness < total) {
+      suggestions.add(const _SuggestionData(
+        title: 'Boost daily enrichment',
+        subtitle: 'Add 15 minutes of sensory play or puzzles to reduce stress.',
+        icon: Icons.psychology_alt,
+        color: Color(0xFFBA68C8),
+      ));
+    }
+
+    suggestions.add(const _SuggestionData(
+      title: 'Hydration and nutrition',
+      subtitle: 'Rotate fresh water twice daily and balance meals with light evening feeds.',
+      icon: Icons.water_drop,
+      color: Color(0xFF4DB6AC),
+    ));
+
+    suggestions.add(const _SuggestionData(
+      title: 'Capture milestones',
+      subtitle: 'Upload today’s happiest moment to build a shared pet journal.',
+      icon: Icons.camera_alt,
+      color: Color(0xFFFFB74D),
+    ));
+
+    return suggestions;
   }
 
   void _onMenuSelected(_DashMenuAction action) {
@@ -256,16 +393,34 @@ class _DashboardHomeState extends State<DashboardHome> {
   Widget build(BuildContext context) {
   // final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: _PetPalette.surface,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         elevation: 0,
-        title: Text('PetBondhuBD', style: TextStyle(color: Colors.deepPurple.shade700)),
-        centerTitle: true,
-        leading: PopupMenuButton<_DashMenuAction>(
-          icon: Icon(Icons.menu, color: Colors.deepPurple.shade700),
-          onSelected: _onMenuSelected,
-          itemBuilder: (context) {
+        toolbarHeight: 78,
+        leadingWidth: 72,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: PopupMenuButton<_DashMenuAction>(
+            offset: const Offset(0, 18),
+            elevation: 8,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            color: Colors.white,
+            onSelected: _onMenuSelected,
+            icon: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: _PetPalette.gradients[0],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: const Icon(Icons.menu, color: Colors.white),
+            ),
+            itemBuilder: (context) {
             final isDark = themeModeNotifier.value == ThemeMode.dark;
             final List<PopupMenuEntry<_DashMenuAction>> entries = [
               PopupMenuItem(
@@ -310,13 +465,66 @@ class _DashboardHomeState extends State<DashboardHome> {
               ),
             );
             return entries;
-          },
+            },
+          ),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _greeting(),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
+            ),
+            Text(
+              'Let’s take great care of your companions',
+              style: TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+          ],
         ),
         actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.search, color: Colors.black54),
-          )
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _PetPalette.primary.withOpacity(28 / 255),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_roleIcon(), size: 16, color: _PetPalette.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        _role,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _PetPalette.primary),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () {},
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: Colors.black12),
+                      ),
+                      child: const Icon(Icons.search, color: Colors.black87),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -324,39 +532,99 @@ class _DashboardHomeState extends State<DashboardHome> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // header
-            Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [Colors.deepPurple.shade400, Colors.teal.shade300]),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(18)),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Row(
-                children: [
-                  CircleAvatar(radius: 34, backgroundColor: Colors.white24, child: const Icon(Icons.pets, color: Colors.white)),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Welcome back, ${widget.userName}', style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 6),
-                        const Text('Explore your pets and options', style: TextStyle(color: Colors.white70)),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _petsFuture,
+              builder: (context, snapshot) {
+                final pets = snapshot.data ?? [];
+                final metrics = _computeMetrics(pets);
+                final gradient = _heroGradient((metrics['total'] ?? 0) + 1);
+                final featurePet = pets.isNotEmpty ? pets[_petIndex % pets.length] : null;
+                final featureName = featurePet?['name']?.toString() ?? 'Your next adventure';
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeInOut,
+                    decoration: BoxDecoration(
+                      gradient: gradient,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0x336750A4), blurRadius: 20, offset: Offset(0, 12)),
                       ],
                     ),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(60 / 255),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Icon(Icons.pets, size: 34, color: Colors.white),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Welcome back, ${widget.userName}',
+                                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        pets.isEmpty
+                                            ? 'Add your first companion to unlock health insights and reminders.'
+                                            : 'Today is perfect for a quick check on $featureName’s routine.',
+                                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white,
+                                    foregroundColor: _PetPalette.primary,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                    elevation: 0,
+                                  ),
+                                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FindDiseasePage())),
+                                  icon: const Icon(Icons.monitor_heart),
+                                  label: const Text('Health Scan'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 18),
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
+                              children: [
+                                _HeroMetricChip(icon: Icons.pets, label: 'Companions', value: metrics['total']?.toString() ?? '0'),
+                                _HeroMetricChip(icon: Icons.vaccines, label: 'Vaccinated', value: metrics['vaccinated']?.toString() ?? '0'),
+                                _HeroMetricChip(icon: Icons.event_available, label: 'Appointments', value: metrics['appointments']?.toString() ?? '0'),
+                                _HeroMetricChip(icon: Icons.favorite, label: 'Wellness good', value: metrics['wellness']?.toString() ?? '0'),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.deepPurple),
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FindDiseasePage())),
-                    icon: const Icon(Icons.biotech_outlined),
-                    label: const Text('Check Health'),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
-          ),
 
           const SizedBox(height: 14),
 
@@ -463,7 +731,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                   children: [
                     Expanded(
                       child: _StatCard(
-                        icon: Icons.verified,
+                        icon: Icons.vaccines_outlined,
                         title: 'Vaccinated',
                         value: vaccinated.toString(),
                         onTap: () => showDetail('Vaccinated Pets', vaccinatedLines),
@@ -472,7 +740,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _StatCard(
-                        icon: Icons.favorite,
+                        icon: Icons.spa_outlined,
                         title: 'Wellness Good',
                         value: wellnessGood.toString(),
                         onTap: () => showDetail('Wellness Good', wellnessLines),
@@ -481,7 +749,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _StatCard(
-                        icon: Icons.event,
+                        icon: Icons.event_available,
                         title: 'Appointments',
                         value: appointments.toString(),
                         onTap: () => showDetail('Appointments', appointmentLines),
@@ -527,28 +795,42 @@ class _DashboardHomeState extends State<DashboardHome> {
                   itemBuilder: (context, index) {
                     final pet = pets[index];
                     final name = pet['name']?.toString() ?? 'Pet';
-                    final desc = pet['desc']?.toString() ?? 'No recent activity';
+                    final desc = pet['desc']?.toString() ?? 'No recent activity yet.';
                     final img = pet['image']?.toString() ?? '';
-                    final color = Colors.primaries[index % Colors.primaries.length].shade100;
-                    return Transform.scale(
-                      scale: _petIndex == index ? 1 : 0.96,
-                      child: Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), color: color),
-                          child: Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
+                    final species = (pet['species'] ?? pet['type'] ?? 'Companion').toString();
+                    final age = pet['age'];
+                    final weight = pet['weight'];
+                    final wellness = (pet['wellness'] ?? 'Balanced').toString();
+                    final gradient = LinearGradient(
+                      colors: _PetPalette.gradients[(index + 1) % _PetPalette.gradients.length],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    );
+
+                    return AnimatedScale(
+                      duration: const Duration(milliseconds: 320),
+                      scale: _petIndex == index ? 1 : 0.94,
+                      curve: Curves.easeOutBack,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(26),
+                          gradient: gradient,
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x226750A4), blurRadius: 18, offset: Offset(0, 10)),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
                                 child: Container(
-                                  width: 110,
-                                  height: 110,
+                                  width: 116,
+                                  height: 116,
                                   decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6)],
+                                    color: Colors.white.withOpacity(80 / 255),
                                   ),
                                   child: Builder(
                                     builder: (context) {
@@ -560,27 +842,81 @@ class _DashboardHomeState extends State<DashboardHome> {
                                           return Image.network(img, fit: BoxFit.cover);
                                         }
                                       }
-                                      return const Icon(Icons.pets, size: 56, color: Colors.deepPurple);
+                                      return const Center(
+                                        child: Icon(Icons.pets, size: 56, color: Colors.white),
+                                      );
                                     },
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(0, 20, 18, 20),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                                    const SizedBox(height: 6),
-                                    Text(desc, style: const TextStyle(color: Colors.black54), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            name,
+                                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        _InfoChip(icon: Icons.pets, label: species, color: Colors.white),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      desc,
+                                      style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                     const SizedBox(height: 12),
-                                    Row(children: [ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A00F4), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10)), child: const Text('View')), const SizedBox(width: 8), OutlinedButton(onPressed: () {}, style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)), side: const BorderSide(color: Color(0xFF6A00F4))), child: const Text('Feed'))])
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 6,
+                                      children: [
+                                        if (age != null) _InfoChip(icon: Icons.cake_outlined, label: '${age.toString()} yrs'),
+                                        if (weight != null) _InfoChip(icon: Icons.monitor_weight_outlined, label: '${weight.toString()} kg'),
+                                        _InfoChip(icon: Icons.favorite_outline, label: wellness),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Row(
+                                      children: [
+                                        ElevatedButton(
+                                          onPressed: () {},
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.white,
+                                            foregroundColor: _PetPalette.primary,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                            elevation: 0,
+                                          ),
+                                          child: const Text('Profile'),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        TextButton(
+                                          onPressed: () {},
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
+                                          ),
+                                          child: const Text('Care Log'),
+                                        ),
+                                      ],
+                                    ),
                                   ],
                                 ),
-                              )
-                            ],
-                          ),
+                              ),
+                            )
+                          ],
                         ),
                       ),
                     );
@@ -603,13 +939,13 @@ class _DashboardHomeState extends State<DashboardHome> {
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final actions = <_QuickAction>[
-                        _QuickAction(title: 'Emergency', icon: Icons.local_hospital, color: Colors.redAccent, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => EmergencyContactPage()))),
-                        _QuickAction(title: 'Forum', icon: Icons.forum, color: Colors.deepPurple, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CommunityForumPage()))),
-                        _QuickAction(title: 'Adopt', icon: Icons.pets, color: Colors.teal, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdoptionPage()))),
-                        _QuickAction(title: 'Pet Shop', icon: Icons.storefront, color: Colors.orange, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PetShopPage()))),
-                        _QuickAction(title: 'Care Hub', icon: Icons.health_and_safety, color: Colors.indigo, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PetCareHub()))),
-                        _QuickAction(title: 'Lost Pet', icon: Icons.search, color: Colors.red, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LostPetPage()))),
-                        _QuickAction(title: 'Found Pet', icon: Icons.favorite, color: Colors.green, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FoundPetPage()))),
+                        _QuickAction(title: 'Emergency', icon: Icons.medical_services_outlined, color: const Color(0xFFE57373), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => EmergencyContactPage()))),
+                        _QuickAction(title: 'Community', icon: Icons.forum_outlined, color: _PetPalette.primary, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CommunityForumPage()))),
+                        _QuickAction(title: 'Adoption', icon: Icons.volunteer_activism_outlined, color: const Color(0xFF4DB6AC), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdoptionPage()))),
+                        _QuickAction(title: 'Pet Shop', icon: Icons.shopping_bag_outlined, color: const Color(0xFFFFC178), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PetShopPage()))),
+                        _QuickAction(title: 'Care Hub', icon: Icons.monitor_heart_outlined, color: const Color(0xFF7986CB), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PetCareHub()))),
+                        _QuickAction(title: 'Lost Pet', icon: Icons.search, color: const Color(0xFFEF9A9A), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LostPetPage()))),
+                        _QuickAction(title: 'Found Pet', icon: Icons.favorite_outline, color: const Color(0xFFA5D6A7), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FoundPetPage()))),
                       ];
                       // target small square buttons ~72px, wrap to multiple rows if needed
                         final double spacing = 10;
@@ -670,35 +1006,26 @@ class _DashboardHomeState extends State<DashboardHome> {
                   const Text('Smart Care Suggestions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 10),
                   SizedBox(
-                    height: 140,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: const [
-                        _SuggestionCard(
-                          title: 'Hydration Reminder',
-                          subtitle: 'Ensure fresh water is changed twice daily.',
-                          icon: Icons.water_drop,
-                          color: Colors.teal,
-                        ),
-                        _SuggestionCard(
-                          title: 'Daily Grooming',
-                          subtitle: '5 min brushing reduces shedding & stress.',
-                          icon: Icons.brush,
-                          color: Colors.indigo,
-                        ),
-                        _SuggestionCard(
-                          title: 'Exercise Goal',
-                          subtitle: 'Aim for 30 min active play / walks.',
-                          icon: Icons.directions_run,
-                          color: Colors.orange,
-                        ),
-                        _SuggestionCard(
-                          title: 'Vet Check Cycle',
-                          subtitle: 'Schedule annual wellness examination.',
-                          icon: Icons.medical_services,
-                          color: Colors.deepPurple,
-                        ),
-                      ],
+                    height: 150,
+                    child: FutureBuilder<List<Map<String, dynamic>>>(
+                      future: _petsFuture,
+                      builder: (context, snapshot) {
+                        final suggestions = _generateSuggestions(snapshot.data ?? []);
+                        return ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: suggestions.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 12),
+                          itemBuilder: (context, index) {
+                            final suggestion = suggestions[index];
+                            return _SuggestionCard(
+                              title: suggestion.title,
+                              subtitle: suggestion.subtitle,
+                              icon: suggestion.icon,
+                              color: suggestion.color,
+                            );
+                          },
+                        );
+                      },
                     ),
                   ),
 
@@ -732,7 +1059,46 @@ class _QuickAction {
   const _QuickAction({required this.title, required this.icon, required this.color, required this.onTap});
 }
 
+class _SuggestionData {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+
+  const _SuggestionData({required this.title, required this.subtitle, required this.icon, required this.color});
+}
+
 // ================== COMPONENTS ==================
+
+class _HeroMetricChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  const _HeroMetricChip({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(40 / 255),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withOpacity(56 / 255)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            '$value $label',
+            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 // (Old quick-circle button helpers removed; use action cards or direct navigation from actions)
 
@@ -752,39 +1118,55 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final card = Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 3))],
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          colors: [
+            _PetPalette.primary.withOpacity(30 / 255),
+            _PetPalette.secondary.withOpacity(26 / 255),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: const [
+          BoxShadow(color: Color(0x1A6750A4), blurRadius: 14, offset: Offset(0, 8)),
+        ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(color: Colors.deepPurple.shade50, borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, color: Colors.deepPurple, size: 20),
-          ),
-          const SizedBox(width: 10),
-          Flexible(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 12, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text(value, style: const TextStyle(fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-              ],
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(180 / 255),
             ),
-          )
+            child: Icon(icon, color: _PetPalette.primary, size: 20),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 12, color: Colors.white70),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
     if (onTap == null) return card;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(20),
       child: card,
     );
   }
@@ -798,34 +1180,47 @@ class _MiniActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 80,
-      height: 80,
+      width: 96,
+      height: 96,
       child: Material(
-        color: Colors.white,
-        elevation: 2,
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.transparent,
         child: InkWell(
           onTap: action.onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(8),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                colors: [
+                  action.color.withOpacity(80 / 255),
+                  action.color.withOpacity(36 / 255),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(color: action.color.withOpacity(96 / 255)),
+              boxShadow: [
+                BoxShadow(color: action.color.withOpacity(64 / 255), blurRadius: 14, offset: const Offset(0, 8)),
+              ],
+            ),
+            padding: const EdgeInsets.all(12),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 34,
-                  height: 34,
+                  width: 38,
+                  height: 38,
                   decoration: BoxDecoration(
-                    color: action.color.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
+                    shape: BoxShape.circle,
+                    color: Colors.white.withOpacity(210 / 255),
                   ),
-                  child: Icon(action.icon, size: 20, color: action.color),
+                  child: Icon(action.icon, size: 22, color: action.color),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 8),
                 Text(
                   action.title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -833,6 +1228,46 @@ class _MiniActionButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  const _InfoChip({required this.icon, required this.label, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color baseColor;
+    final Color textColor;
+    if (color != null) {
+      baseColor = color!;
+      textColor = color!.computeLuminance() > 0.6 ? Colors.black87 : Colors.white;
+    } else {
+      baseColor = const Color(0xFF212121).withAlpha(210);
+      textColor = const Color(0xFF212121);
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: baseColor.withAlpha(36),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: baseColor.withAlpha(64)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: textColor),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textColor),
+          ),
+        ],
       ),
     );
   }
@@ -848,38 +1283,53 @@ class _RichOverviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      color: color.withOpacity(0.10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(color: color.withOpacity(0.18), borderRadius: BorderRadius.circular(12)),
-                  child: Icon(icon, color: color, size: 22),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: color)),
-                )
-              ],
-            ),
-            const SizedBox(height: 8),
-            for (final l in lines.take(4))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(l, style: const TextStyle(fontSize: 12, color: Colors.black87), maxLines: 2, overflow: TextOverflow.ellipsis),
-              ),
-            if (lines.length > 4)
-              Text('+ ${lines.length - 4} more', style: const TextStyle(fontSize: 12, color: Colors.black54)),
-          ],
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        gradient: LinearGradient(
+          colors: [color.withAlpha(48), color.withAlpha(24)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        border: Border.all(color: color.withAlpha(72)),
+        boxShadow: [
+          BoxShadow(color: color.withAlpha(64), blurRadius: 16, offset: const Offset(0, 10)),
+        ],
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: Colors.white.withAlpha(190), borderRadius: BorderRadius.circular(14)),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+              )
+            ],
+          ),
+          const SizedBox(height: 12),
+          for (final line in lines.take(4))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(
+                line,
+                style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.3),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          if (lines.length > 4)
+            Text(
+              '+ ${lines.length - 4} more',
+              style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+        ],
       ),
     );
   }
@@ -899,16 +1349,16 @@ class _SuggestionCard extends StatelessWidget {
       margin: const EdgeInsets.only(right: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withAlpha(36),
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 3))],
+        boxShadow: [BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 6, offset: const Offset(0, 3))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withOpacity(0.22), borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(color: color.withAlpha(56), borderRadius: BorderRadius.circular(14)),
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(height: 10),
