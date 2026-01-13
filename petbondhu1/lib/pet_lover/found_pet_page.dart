@@ -14,6 +14,8 @@ class FoundPetPage extends StatefulWidget {
 
 class _FoundPetPageState extends State<FoundPetPage> {
   final _firestore = FirebaseFirestore.instance;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchTerm = '';
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _foundPetsStream() {
     return _firestore
@@ -34,6 +36,12 @@ class _FoundPetPageState extends State<FoundPetPage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -41,6 +49,18 @@ class _FoundPetPageState extends State<FoundPetPage> {
         backgroundColor: Colors.green.shade600,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Clear search',
+            icon: const Icon(Icons.clear),
+            onPressed: _searchTerm.isEmpty
+                ? null
+                : () {
+                    _searchController.clear();
+                    setState(() => _searchTerm = '');
+                  },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddFoundPetDialog,
@@ -61,7 +81,11 @@ class _FoundPetPageState extends State<FoundPetPage> {
             ),
             child: Column(
               children: [
-                Icon(Icons.favorite, size: 48, color: Colors.white.withOpacity(0.9)),
+                Icon(
+                  Icons.favorite,
+                  size: 48,
+                  color: Colors.white.withOpacity(0.9),
+                ),
                 const SizedBox(height: 8),
                 const Text(
                   'Found a Pet?',
@@ -80,6 +104,31 @@ class _FoundPetPageState extends State<FoundPetPage> {
             ),
           ),
 
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) =>
+                  setState(() => _searchTerm = value.trim().toLowerCase()),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchTerm.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchTerm = '');
+                        },
+                      ),
+                hintText: 'Search by pet type or note',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+
           // List of found pets
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -92,16 +141,34 @@ class _FoundPetPageState extends State<FoundPetPage> {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
                 final docs = snapshot.data?.docs ?? [];
-                if (docs.isEmpty) {
+                final filtered = docs.where((doc) {
+                  if (_searchTerm.isEmpty) return true;
+                  final map = doc.data();
+                  final title = (map['petType'] ?? '').toString().toLowerCase();
+                  final description = (map['description'] ?? '')
+                      .toString()
+                      .toLowerCase();
+                  return title.contains(_searchTerm) ||
+                      description.contains(_searchTerm);
+                }).toList();
+
+                if (filtered.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 12),
                         Text(
                           'No found pets reported',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
+                          ),
                         ),
                       ],
                     ),
@@ -109,9 +176,9 @@ class _FoundPetPageState extends State<FoundPetPage> {
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.all(12),
-                  itemCount: docs.length,
+                  itemCount: filtered.length,
                   itemBuilder: (context, index) {
-                    final doc = docs[index];
+                    final doc = filtered[index];
                     final data = doc.data();
                     return _FoundPetCard(data: data, docId: doc.id);
                   },
@@ -155,7 +222,9 @@ class _FoundPetCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
             decoration: BoxDecoration(
               color: status == 'claimed' ? Colors.blue : Colors.green.shade600,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
             ),
             child: Row(
               children: [
@@ -166,7 +235,9 @@ class _FoundPetCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  status == 'claimed' ? 'CLAIMED BY OWNER' : 'WAITING FOR OWNER',
+                  status == 'claimed'
+                      ? 'CLAIMED BY OWNER'
+                      : 'WAITING FOR OWNER',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -208,10 +279,16 @@ class _FoundPetCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       if (foundDate.isNotEmpty)
-                        _InfoRow(icon: Icons.calendar_today, text: 'Found: $foundDate'),
+                        _InfoRow(
+                          icon: Icons.calendar_today,
+                          text: 'Found: $foundDate',
+                        ),
                       _InfoRow(icon: Icons.location_on, text: whereFound),
                       if (pickupAddress.isNotEmpty)
-                        _InfoRow(icon: Icons.home, text: 'Pickup: $pickupAddress'),
+                        _InfoRow(
+                          icon: Icons.home,
+                          text: 'Pickup: $pickupAddress',
+                        ),
                     ],
                   ),
                 ),
@@ -290,9 +367,13 @@ class _FoundPetCard extends StatelessWidget {
         return Icon(Icons.pets, size: 48, color: Colors.grey.shade400);
       }
     }
-    return Image.network(img, fit: BoxFit.cover, errorBuilder: (_, __, ___) {
-      return Icon(Icons.pets, size: 48, color: Colors.grey.shade400);
-    });
+    return Image.network(
+      img,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) {
+        return Icon(Icons.pets, size: 48, color: Colors.grey.shade400);
+      },
+    );
   }
 
   void _showDetailsDialog(BuildContext context) {
@@ -305,13 +386,34 @@ class _FoundPetCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _DetailItem(label: 'Pet Type', value: data['petType'] ?? 'Unknown'),
-              _DetailItem(label: 'Description', value: data['description'] ?? 'N/A'),
-              _DetailItem(label: 'Where Found', value: data['whereFound'] ?? 'Unknown'),
-              _DetailItem(label: 'Pickup Address', value: data['pickupAddress'] ?? 'N/A'),
-              _DetailItem(label: 'Date Found', value: data['foundDate'] ?? 'Unknown'),
-              _DetailItem(label: 'Contact', value: data['contactNumber'] ?? 'N/A'),
-              _DetailItem(label: 'Reported By', value: data['finderName'] ?? 'Anonymous'),
+              _DetailItem(
+                label: 'Pet Type',
+                value: data['petType'] ?? 'Unknown',
+              ),
+              _DetailItem(
+                label: 'Description',
+                value: data['description'] ?? 'N/A',
+              ),
+              _DetailItem(
+                label: 'Where Found',
+                value: data['whereFound'] ?? 'Unknown',
+              ),
+              _DetailItem(
+                label: 'Pickup Address',
+                value: data['pickupAddress'] ?? 'N/A',
+              ),
+              _DetailItem(
+                label: 'Date Found',
+                value: data['foundDate'] ?? 'Unknown',
+              ),
+              _DetailItem(
+                label: 'Contact',
+                value: data['contactNumber'] ?? 'N/A',
+              ),
+              _DetailItem(
+                label: 'Reported By',
+                value: data['finderName'] ?? 'Anonymous',
+              ),
             ],
           ),
         ),
@@ -365,7 +467,10 @@ class _DetailItem extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
           const SizedBox(height: 2),
           Text(value, style: const TextStyle(fontSize: 14)),
         ],
@@ -397,7 +502,10 @@ class _AddFoundPetFormState extends State<_AddFoundPetForm> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800);
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+    );
     if (file == null) return;
     final bytes = await file.readAsBytes();
     setState(() => _imageBytes = bytes);
@@ -405,7 +513,7 @@ class _AddFoundPetFormState extends State<_AddFoundPetForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -432,13 +540,15 @@ class _AddFoundPetFormState extends State<_AddFoundPetForm> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Found pet report submitted! Thank you!')),
+          const SnackBar(
+            content: Text('Found pet report submitted! Thank you!'),
+          ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {
       setState(() => _isSubmitting = false);
     }
@@ -499,9 +609,16 @@ class _AddFoundPetFormState extends State<_AddFoundPetForm> {
                       : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey.shade500),
+                            Icon(
+                              Icons.add_photo_alternate,
+                              size: 40,
+                              color: Colors.grey.shade500,
+                            ),
                             const SizedBox(height: 8),
-                            Text('Tap to add photo', style: TextStyle(color: Colors.grey.shade600)),
+                            Text(
+                              'Tap to add photo',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
                           ],
                         ),
                 ),
@@ -515,7 +632,8 @@ class _AddFoundPetFormState extends State<_AddFoundPetForm> {
                   prefixIcon: Icon(Icons.category),
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
 
@@ -537,7 +655,8 @@ class _AddFoundPetFormState extends State<_AddFoundPetForm> {
                   prefixIcon: Icon(Icons.location_on),
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
 
@@ -569,7 +688,8 @@ class _AddFoundPetFormState extends State<_AddFoundPetForm> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.phone,
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 20),
 
@@ -587,9 +707,15 @@ class _AddFoundPetFormState extends State<_AddFoundPetForm> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Text('Submit Report', style: TextStyle(fontSize: 16)),
+                    : const Text(
+                        'Submit Report',
+                        style: TextStyle(fontSize: 16),
+                      ),
               ),
               const SizedBox(height: 12),
             ],

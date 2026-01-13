@@ -14,6 +14,8 @@ class LostPetPage extends StatefulWidget {
 
 class _LostPetPageState extends State<LostPetPage> {
   final _firestore = FirebaseFirestore.instance;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchTerm = '';
 
   Stream<QuerySnapshot<Map<String, dynamic>>> _lostPetsStream() {
     return _firestore
@@ -34,6 +36,12 @@ class _LostPetPageState extends State<LostPetPage> {
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -41,6 +49,18 @@ class _LostPetPageState extends State<LostPetPage> {
         backgroundColor: Colors.red.shade600,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Clear search',
+            icon: const Icon(Icons.clear),
+            onPressed: _searchTerm.isEmpty
+                ? null
+                : () {
+                    _searchController.clear();
+                    setState(() => _searchTerm = '');
+                  },
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddLostPetDialog,
@@ -61,7 +81,11 @@ class _LostPetPageState extends State<LostPetPage> {
             ),
             child: Column(
               children: [
-                Icon(Icons.pets, size: 48, color: Colors.white.withOpacity(0.9)),
+                Icon(
+                  Icons.pets,
+                  size: 48,
+                  color: Colors.white.withOpacity(0.9),
+                ),
                 const SizedBox(height: 8),
                 const Text(
                   'Help Find Lost Pets',
@@ -80,6 +104,31 @@ class _LostPetPageState extends State<LostPetPage> {
             ),
           ),
 
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) =>
+                  setState(() => _searchTerm = value.trim().toLowerCase()),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchTerm.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchTerm = '');
+                        },
+                      ),
+                hintText: 'Search by pet name',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+
           // List of lost pets
           Expanded(
             child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -92,16 +141,31 @@ class _LostPetPageState extends State<LostPetPage> {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
                 final docs = snapshot.data?.docs ?? [];
-                if (docs.isEmpty) {
+                final filtered = docs.where((doc) {
+                  if (_searchTerm.isEmpty) return true;
+                  final name = (doc.data()['petName'] ?? '')
+                      .toString()
+                      .toLowerCase();
+                  return name.contains(_searchTerm);
+                }).toList();
+
+                if (filtered.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.search_off, size: 64, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 12),
                         Text(
                           'No lost pets reported',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 16,
+                          ),
                         ),
                       ],
                     ),
@@ -109,9 +173,9 @@ class _LostPetPageState extends State<LostPetPage> {
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.all(12),
-                  itemCount: docs.length,
+                  itemCount: filtered.length,
                   itemBuilder: (context, index) {
-                    final doc = docs[index];
+                    final doc = filtered[index];
                     final data = doc.data();
                     return _LostPetCard(data: data, docId: doc.id);
                   },
@@ -155,7 +219,9 @@ class _LostPetCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
             decoration: BoxDecoration(
               color: status == 'found' ? Colors.green : Colors.red.shade600,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
             ),
             child: Row(
               children: [
@@ -209,7 +275,10 @@ class _LostPetCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       _InfoRow(icon: Icons.category, text: petType),
                       if (lastSeenDate.isNotEmpty)
-                        _InfoRow(icon: Icons.calendar_today, text: 'Lost: $lastSeenDate'),
+                        _InfoRow(
+                          icon: Icons.calendar_today,
+                          text: 'Lost: $lastSeenDate',
+                        ),
                       _InfoRow(icon: Icons.location_on, text: lastSeenLocation),
                     ],
                   ),
@@ -289,9 +358,13 @@ class _LostPetCard extends StatelessWidget {
         return Icon(Icons.pets, size: 48, color: Colors.grey.shade400);
       }
     }
-    return Image.network(img, fit: BoxFit.cover, errorBuilder: (_, __, ___) {
-      return Icon(Icons.pets, size: 48, color: Colors.grey.shade400);
-    });
+    return Image.network(
+      img,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) {
+        return Icon(Icons.pets, size: 48, color: Colors.grey.shade400);
+      },
+    );
   }
 
   void _showDetailsDialog(BuildContext context) {
@@ -304,12 +377,30 @@ class _LostPetCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _DetailItem(label: 'Pet Type', value: data['petType'] ?? 'Unknown'),
-              _DetailItem(label: 'Description', value: data['description'] ?? 'N/A'),
-              _DetailItem(label: 'Last Seen', value: data['lastSeenLocation'] ?? 'Unknown'),
-              _DetailItem(label: 'Date Lost', value: data['lastSeenDate'] ?? 'Unknown'),
-              _DetailItem(label: 'Contact', value: data['contactNumber'] ?? 'N/A'),
-              _DetailItem(label: 'Owner', value: data['ownerName'] ?? 'Anonymous'),
+              _DetailItem(
+                label: 'Pet Type',
+                value: data['petType'] ?? 'Unknown',
+              ),
+              _DetailItem(
+                label: 'Description',
+                value: data['description'] ?? 'N/A',
+              ),
+              _DetailItem(
+                label: 'Last Seen',
+                value: data['lastSeenLocation'] ?? 'Unknown',
+              ),
+              _DetailItem(
+                label: 'Date Lost',
+                value: data['lastSeenDate'] ?? 'Unknown',
+              ),
+              _DetailItem(
+                label: 'Contact',
+                value: data['contactNumber'] ?? 'N/A',
+              ),
+              _DetailItem(
+                label: 'Owner',
+                value: data['ownerName'] ?? 'Anonymous',
+              ),
             ],
           ),
         ),
@@ -363,7 +454,10 @@ class _DetailItem extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
           const SizedBox(height: 2),
           Text(value, style: const TextStyle(fontSize: 14)),
         ],
@@ -395,7 +489,10 @@ class _AddLostPetFormState extends State<_AddLostPetForm> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800);
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+    );
     if (file == null) return;
     final bytes = await file.readAsBytes();
     setState(() => _imageBytes = bytes);
@@ -403,7 +500,7 @@ class _AddLostPetFormState extends State<_AddLostPetForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -434,9 +531,9 @@ class _AddLostPetFormState extends State<_AddLostPetForm> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed: $e')));
     } finally {
       setState(() => _isSubmitting = false);
     }
@@ -497,9 +594,16 @@ class _AddLostPetFormState extends State<_AddLostPetForm> {
                       : Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.add_photo_alternate, size: 40, color: Colors.grey.shade500),
+                            Icon(
+                              Icons.add_photo_alternate,
+                              size: 40,
+                              color: Colors.grey.shade500,
+                            ),
                             const SizedBox(height: 8),
-                            Text('Tap to add photo', style: TextStyle(color: Colors.grey.shade600)),
+                            Text(
+                              'Tap to add photo',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
                           ],
                         ),
                 ),
@@ -513,7 +617,8 @@ class _AddLostPetFormState extends State<_AddLostPetForm> {
                   prefixIcon: Icon(Icons.pets),
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
 
@@ -524,7 +629,8 @@ class _AddLostPetFormState extends State<_AddLostPetForm> {
                   prefixIcon: Icon(Icons.category),
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
 
@@ -546,7 +652,8 @@ class _AddLostPetFormState extends State<_AddLostPetForm> {
                   prefixIcon: Icon(Icons.location_on),
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 12),
 
@@ -568,7 +675,8 @@ class _AddLostPetFormState extends State<_AddLostPetForm> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.phone,
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 20),
 
@@ -586,9 +694,15 @@ class _AddLostPetFormState extends State<_AddLostPetForm> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Text('Submit Report', style: TextStyle(fontSize: 16)),
+                    : const Text(
+                        'Submit Report',
+                        style: TextStyle(fontSize: 16),
+                      ),
               ),
               const SizedBox(height: 12),
             ],

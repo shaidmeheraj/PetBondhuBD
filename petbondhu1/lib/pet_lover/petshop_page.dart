@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -16,6 +18,7 @@ class _PetShopPageState extends State<PetShopPage> {
   final TextEditingController _shopProductCtrl = TextEditingController();
   final TextEditingController _shopDescCtrl = TextEditingController();
   final TextEditingController _shopContactCtrl = TextEditingController();
+  final TextEditingController _searchCtrl = TextEditingController();
 
   final _shopFormKey = GlobalKey<FormState>();
   String? _pickedShopImageBase64;
@@ -23,11 +26,29 @@ class _PetShopPageState extends State<PetShopPage> {
 
   // 0 = listing, 1 = add product form
   int _viewIndex = 0;
+  String _searchTerm = '';
+  StreamSubscription<User?>? _authSub;
+  String? _currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted) return;
+      setState(() => _currentUserId = user?.uid);
+    });
+  }
 
   Future<void> _pickShopImage() async {
     try {
       final ImagePicker picker = ImagePicker();
-      final XFile? file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1200, maxHeight: 1200, imageQuality: 80);
+      final XFile? file = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
+      );
       if (file == null) return;
       final bytes = await file.readAsBytes();
       final b64 = base64Encode(bytes);
@@ -35,16 +56,27 @@ class _PetShopPageState extends State<PetShopPage> {
         _pickedShopImageBase64 = 'data:image;base64,$b64';
       });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Image pick failed: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Image pick failed: $e')));
     }
   }
 
   Future<void> _addShopProduct() async {
     if (!(_shopFormKey.currentState?.validate() ?? false)) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to list products.')),
+      );
+    }
+    if (user == null) return;
     setState(() => _saving = true);
     try {
       await FirebaseFirestore.instance.collection('product').add({
         'owner': _shopOwnerCtrl.text.trim(),
+        'ownerId': user.uid,
+        'ownerEmail': user.email ?? '',
         'product': _shopProductCtrl.text.trim(),
         'description': _shopDescCtrl.text.trim(),
         'picture': _pickedShopImageBase64 ?? '',
@@ -53,7 +85,9 @@ class _PetShopPageState extends State<PetShopPage> {
         'date': FieldValue.serverTimestamp(),
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Product listed')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Product listed')));
         setState(() {
           _shopOwnerCtrl.clear();
           _shopProductCtrl.clear();
@@ -65,14 +99,29 @@ class _PetShopPageState extends State<PetShopPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error saving product: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving product: $e')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  Future<void> _updateProductStatus(DocumentReference ref, String status) async {
+  Future<void> _updateProductStatus(
+    DocumentReference ref,
+    String status,
+    String ownerId,
+  ) async {
+    final canManage = _currentUserId != null && ownerId == _currentUserId;
+    if (!canManage) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Only the owner can change this status.')),
+        );
+      }
+      return;
+    }
     try {
       await ref.update({
         'status': status,
@@ -80,12 +129,68 @@ class _PetShopPageState extends State<PetShopPage> {
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(status == 'sold' ? 'Marked as sold' : 'Marked as available')),
+          SnackBar(
+            content: Text(
+              status == 'sold' ? 'Marked as sold' : 'Marked as available',
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to update status: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update status: $e')));
+      }
+    }
+  }
+
+  Future<void> _deleteProduct(
+    DocumentReference ref,
+    String productName,
+    String ownerId,
+  ) async {
+    final canManage = _currentUserId != null && ownerId == _currentUserId;
+    if (!canManage) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Only the owner can delete this listing.')),
+        );
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Listing?'),
+        content: Text('Delete "$productName" from the marketplace?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await ref.delete();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Listing removed.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete listing: $e')),
+        );
       }
     }
   }
@@ -104,7 +209,11 @@ class _PetShopPageState extends State<PetShopPage> {
                 width: 72,
                 height: 72,
                 color: Colors.grey.shade100,
-                child: _buildImageFromString(_pickedShopImageBase64, width: 72, height: 72),
+                child: _buildImageFromString(
+                  _pickedShopImageBase64,
+                  width: 72,
+                  height: 72,
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -113,20 +222,24 @@ class _PetShopPageState extends State<PetShopPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _shopProductCtrl.text.isEmpty ? 'Product name' : _shopProductCtrl.text,
+                    _shopProductCtrl.text.isEmpty
+                        ? 'Product name'
+                        : _shopProductCtrl.text,
                     style: const TextStyle(fontWeight: FontWeight.bold),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    _shopDescCtrl.text.isEmpty ? 'Product description' : _shopDescCtrl.text,
+                    _shopDescCtrl.text.isEmpty
+                        ? 'Product description'
+                        : _shopDescCtrl.text,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                  )
+                  ),
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -135,16 +248,46 @@ class _PetShopPageState extends State<PetShopPage> {
 
   Widget _shopListings() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection('product').orderBy('date', descending: true).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection('product')
+          .orderBy('date', descending: true)
+          .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.connectionState == ConnectionState.waiting)
+          return const Center(child: CircularProgressIndicator());
         final docs = snapshot.data?.docs ?? [];
-        if (docs.isEmpty) return const Center(child: Text('No products yet.'));
+        final filtered = docs.where((doc) {
+          if (_searchTerm.isEmpty) return true;
+          final data = doc.data() as Map<String, dynamic>;
+          final productName = (data['product'] ?? '').toString().toLowerCase();
+          final desc = (data['description'] ?? '').toString().toLowerCase();
+          final owner = (data['owner'] ?? '').toString().toLowerCase();
+          return productName.contains(_searchTerm) ||
+              desc.contains(_searchTerm) ||
+              owner.contains(_searchTerm);
+        }).toList();
+        if (filtered.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.search_off, size: 64, color: Colors.grey),
+                const SizedBox(height: 12),
+                Text(
+                  _searchTerm.isEmpty
+                      ? 'No products yet.'
+                      : 'No matches for "$_searchTerm"',
+                  style: const TextStyle(fontSize: 16, color: Colors.black54),
+                ),
+              ],
+            ),
+          );
+        }
         return ListView.separated(
-          itemCount: docs.length,
+          itemCount: filtered.length,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
-            final doc = docs[index];
+            final doc = filtered[index];
             final data = doc.data() as Map<String, dynamic>;
             final picture = (data['picture'] ?? '').toString();
             final productName = (data['product'] ?? '').toString();
@@ -152,8 +295,12 @@ class _PetShopPageState extends State<PetShopPage> {
             final desc = (data['description'] ?? '').toString();
             final contact = (data['contact'] ?? '').toString();
             final ts = data['date'];
-            final dateStr = ts is Timestamp ? ts.toDate().toString() : ts?.toString() ?? '';
+            final dateStr = ts is Timestamp
+                ? ts.toDate().toString()
+                : ts?.toString() ?? '';
             final status = (data['status'] ?? 'available').toString();
+            final ownerId = (data['ownerId'] ?? '').toString();
+            final isOwner = ownerId.isNotEmpty && ownerId == _currentUserId;
 
             Color chipColor;
             String chipLabel;
@@ -169,7 +316,9 @@ class _PetShopPageState extends State<PetShopPage> {
 
             return Card(
               margin: const EdgeInsets.symmetric(vertical: 6),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Row(
@@ -181,7 +330,11 @@ class _PetShopPageState extends State<PetShopPage> {
                         width: 56,
                         height: 56,
                         color: Colors.grey.shade100,
-                        child: _buildImageFromString(picture, width: 56, height: 56),
+                        child: _buildImageFromString(
+                          picture,
+                          width: 56,
+                          height: 56,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -189,9 +342,16 @@ class _PetShopPageState extends State<PetShopPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(productName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text(
+                            productName,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
                           const SizedBox(height: 4),
-                          Text(desc, maxLines: 2, overflow: TextOverflow.ellipsis),
+                          Text(
+                            desc,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                           const SizedBox(height: 6),
                           Wrap(
                             spacing: 8,
@@ -201,12 +361,29 @@ class _PetShopPageState extends State<PetShopPage> {
                               Chip(
                                 label: Text(chipLabel),
                                 backgroundColor: chipColor.withOpacity(0.15),
-                                labelStyle: TextStyle(color: chipColor, fontWeight: FontWeight.w600),
-                                side: BorderSide(color: chipColor.withOpacity(0.3)),
+                                labelStyle: TextStyle(
+                                  color: chipColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                side: BorderSide(
+                                  color: chipColor.withOpacity(0.3),
+                                ),
                                 visualDensity: VisualDensity.compact,
                               ),
-                              Text('by $owner', style: const TextStyle(fontSize: 12, color: Colors.black87)),
-                              Text(dateStr, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                              Text(
+                                'by $owner',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                dateStr,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.black54,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 8),
@@ -218,13 +395,42 @@ class _PetShopPageState extends State<PetShopPage> {
                                 onPressed: () => _showContactDialog(contact),
                                 icon: const Icon(Icons.call, size: 18),
                                 label: const Text('Contact'),
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.deepOrange,
+                                ),
                               ),
-                              OutlinedButton.icon(
-                                onPressed: () => _updateProductStatus(doc.reference, status == 'sold' ? 'available' : 'sold'),
-                                icon: Icon(status == 'sold' ? Icons.undo : Icons.sell_outlined, size: 18),
-                                label: Text(status == 'sold' ? 'Mark Available' : 'Mark Sold'),
-                              ),
+                              if (isOwner)
+                                OutlinedButton.icon(
+                                  onPressed: () => _updateProductStatus(
+                                    doc.reference,
+                                    status == 'sold' ? 'available' : 'sold',
+                                    ownerId,
+                                  ),
+                                  icon: Icon(
+                                    status == 'sold'
+                                        ? Icons.undo
+                                        : Icons.sell_outlined,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    status == 'sold'
+                                        ? 'Mark Available'
+                                        : 'Mark Sold',
+                                  ),
+                                ),
+                              if (isOwner)
+                                OutlinedButton.icon(
+                                  onPressed: () => _deleteProduct(
+                                    doc.reference,
+                                    productName,
+                                    ownerId,
+                                  ),
+                                  icon: const Icon(Icons.delete_outline, size: 18),
+                                  label: const Text('Delete'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.redAccent,
+                                  ),
+                                ),
                             ],
                           ),
                         ],
@@ -246,26 +452,53 @@ class _PetShopPageState extends State<PetShopPage> {
       builder: (context) => AlertDialog(
         title: const Text('Contact'),
         content: Text(contact.isEmpty ? 'No contact provided' : contact),
-        actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close'))],
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildImageFromString(String? imageStr, {double? width, double? height}) {
-    if (imageStr == null || imageStr.isEmpty) return const Icon(Icons.pets, size: 40, color: Colors.teal);
+  Widget _buildImageFromString(
+    String? imageStr, {
+    double? width,
+    double? height,
+  }) {
+    if (imageStr == null || imageStr.isEmpty)
+      return const Icon(Icons.pets, size: 40, color: Colors.teal);
     try {
       if (imageStr.startsWith('data:image')) {
         final comma = imageStr.indexOf(',');
         final payload = comma >= 0 ? imageStr.substring(comma + 1) : imageStr;
         final bytes = base64Decode(payload);
-        return Image.memory(bytes, width: width, height: height, fit: BoxFit.cover);
+        return Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+        );
       }
       if (imageStr.startsWith('http') || imageStr.startsWith('https')) {
-        return Image.network(imageStr, width: width, height: height, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.pets, size: 40, color: Colors.teal));
+        return Image.network(
+          imageStr,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) =>
+              const Icon(Icons.pets, size: 40, color: Colors.teal),
+        );
       }
       if (imageStr.length > 100) {
         final bytes = base64Decode(imageStr);
-        return Image.memory(bytes, width: width, height: height, fit: BoxFit.cover);
+        return Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+        );
       }
     } catch (_) {
       return const Icon(Icons.pets, size: 40, color: Colors.teal);
@@ -275,10 +508,12 @@ class _PetShopPageState extends State<PetShopPage> {
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _shopOwnerCtrl.dispose();
     _shopProductCtrl.dispose();
     _shopDescCtrl.dispose();
     _shopContactCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -289,6 +524,23 @@ class _PetShopPageState extends State<PetShopPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('List a Product', style: Theme.of(context).textTheme.titleLarge),
+          if (_currentUserId == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: const Text(
+                  'Sign in to publish and manage your listings.',
+                  style: TextStyle(color: Colors.deepOrange),
+                ),
+              ),
+            ),
           const SizedBox(height: 12),
           Form(
             key: _shopFormKey,
@@ -296,14 +548,20 @@ class _PetShopPageState extends State<PetShopPage> {
               children: [
                 TextFormField(
                   controller: _shopOwnerCtrl,
-                  decoration: const InputDecoration(labelText: 'Shop Owner Name'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter owner name' : null,
+                  decoration: const InputDecoration(
+                    labelText: 'Shop Owner Name',
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Enter owner name'
+                      : null,
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _shopProductCtrl,
                   decoration: const InputDecoration(labelText: 'Product Name'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter product name' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Enter product name'
+                      : null,
                   onChanged: (_) => setState(() {}),
                 ),
                 const SizedBox(height: 12),
@@ -316,9 +574,12 @@ class _PetShopPageState extends State<PetShopPage> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _shopContactCtrl,
-                  decoration: const InputDecoration(labelText: 'Contact Number'),
+                  decoration: const InputDecoration(
+                    labelText: 'Contact Number',
+                  ),
                   keyboardType: TextInputType.phone,
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter contact' : null,
+                  validator: (v) =>
+                      (v == null || v.trim().isEmpty) ? 'Enter contact' : null,
                 ),
                 const SizedBox(height: 16),
                 Row(
@@ -328,7 +589,9 @@ class _PetShopPageState extends State<PetShopPage> {
                         onPressed: _pickShopImage,
                         icon: const Icon(Icons.photo_library),
                         label: const Text('Choose Image'),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blueGrey),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueGrey,
+                        ),
                       ),
                     ),
                   ],
@@ -341,7 +604,11 @@ class _PetShopPageState extends State<PetShopPage> {
                       width: double.infinity,
                       height: 160,
                       color: Colors.grey.shade100,
-                      child: _buildImageFromString(_pickedShopImageBase64, width: double.infinity, height: 160),
+                      child: _buildImageFromString(
+                        _pickedShopImageBase64,
+                        width: double.infinity,
+                        height: 160,
+                      ),
                     ),
                   ),
                 const SizedBox(height: 16),
@@ -350,10 +617,13 @@ class _PetShopPageState extends State<PetShopPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _saving ? null : _addShopProduct,
+                    onPressed:
+                        _saving || _currentUserId == null ? null : _addShopProduct,
                     icon: const Icon(Icons.add_business),
                     label: Text(_saving ? 'Saving...' : 'List Product'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepOrange,
+                    ),
                   ),
                 ),
               ],
@@ -370,43 +640,94 @@ class _PetShopPageState extends State<PetShopPage> {
       appBar: AppBar(
         title: const Text('Pet Shop'),
         backgroundColor: Colors.orange,
+        actions: [
+          if (_viewIndex == 0)
+            IconButton(
+              tooltip: 'Clear search',
+              icon: const Icon(Icons.clear),
+              onPressed: _searchTerm.isEmpty
+                  ? null
+                  : () {
+                      _searchCtrl.clear();
+                      setState(() => _searchTerm = '');
+                    },
+            ),
+        ],
       ),
       body: Column(
         children: [
           // Toggle buttons row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _viewIndex == 0
+                        ? null
+                        : () => setState(() => _viewIndex = 0),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _viewIndex == 0
+                          ? Colors.deepOrange
+                          : Colors.grey.shade300,
+                      foregroundColor: _viewIndex == 0
+                          ? Colors.white
+                          : Colors.black87,
+                    ),
+                    child: const Text('Available Products'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _viewIndex == 1
+                        ? null
+                        : () => setState(() => _viewIndex = 1),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _viewIndex == 1
+                          ? Colors.blueGrey
+                          : Colors.grey.shade300,
+                      foregroundColor: _viewIndex == 1
+                          ? Colors.white
+                          : Colors.black87,
+                    ),
+                    child: const Text('List Product'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_viewIndex == 0)
             Padding(
-              padding: const EdgeInsets.fromLTRB(12,12,12,0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _viewIndex == 0 ? null : () => setState(() => _viewIndex = 0),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _viewIndex == 0 ? Colors.deepOrange : Colors.grey.shade300,
-                        foregroundColor: _viewIndex == 0 ? Colors.white : Colors.black87,
-                      ),
-                      child: const Text('Available Products'),
-                    ),
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (value) =>
+                    setState(() => _searchTerm = value.trim().toLowerCase()),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _searchTerm.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            setState(() => _searchTerm = '');
+                          },
+                        ),
+                  hintText: 'Search by product, owner, or detail',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _viewIndex == 1 ? null : () => setState(() => _viewIndex = 1),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _viewIndex == 1 ? Colors.blueGrey : Colors.grey.shade300,
-                        foregroundColor: _viewIndex == 1 ? Colors.white : Colors.black87,
-                      ),
-                      child: const Text('List Product'),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          const SizedBox(height: 8),
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
-              transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
+              transitionBuilder: (child, anim) =>
+                  FadeTransition(opacity: anim, child: child),
               child: _viewIndex == 0
                   ? Padding(
                       key: const ValueKey('listing'),
