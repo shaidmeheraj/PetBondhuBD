@@ -1,7 +1,8 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'emergency_contact_page.dart';
 import 'community_forum_page.dart';
 import 'adoption_page.dart';
@@ -32,10 +33,7 @@ class _PetPalette {
 class DashboardMain extends StatefulWidget {
   final String userName;
 
-  const DashboardMain({
-    super.key,
-    this.userName = "User",
-  });
+  const DashboardMain({super.key, this.userName = "User"});
 
   @override
   State<DashboardMain> createState() => _DashboardMainState();
@@ -67,6 +65,7 @@ class _DashboardMainState extends State<DashboardMain> {
     return Scaffold(
       // Show the currently selected page in the body
       body: _pages[_selectedIndex],
+
       // Provide a global action to run the backend prediction UI from any tab
       // floatingActionButton: FloatingActionButton.extended(
       //   onPressed: () {
@@ -79,19 +78,22 @@ class _DashboardMainState extends State<DashboardMain> {
       //   icon: const Icon(Icons.biotech),
       //   backgroundColor: Colors.deepPurple,
       // ),
-      
       bottomNavigationBar: NavigationBarTheme(
         data: NavigationBarThemeData(
           indicatorColor: _PetPalette.primary.withOpacity(32 / 255),
           labelTextStyle: WidgetStateProperty.resolveWith(
             (states) => TextStyle(
               fontWeight: FontWeight.w700,
-              color: states.contains(WidgetState.selected) ? _PetPalette.primary : Colors.black54,
+              color: states.contains(WidgetState.selected)
+                  ? _PetPalette.primary
+                  : Colors.black54,
             ),
           ),
           iconTheme: WidgetStateProperty.resolveWith(
             (states) => IconThemeData(
-              color: states.contains(WidgetState.selected) ? _PetPalette.primary : Colors.black38,
+              color: states.contains(WidgetState.selected)
+                  ? _PetPalette.primary
+                  : Colors.black38,
               size: states.contains(WidgetState.selected) ? 26 : 24,
             ),
           ),
@@ -161,7 +163,10 @@ class _DashboardHomeState extends State<DashboardHome> {
       final db = FirebaseFirestore.instance;
       if (user == null) return [];
       // Load user's pets from 'mypet' collection
-      final snapshot = await db.collection('mypet').where('ownerId', isEqualTo: user.uid).get();
+      final snapshot = await db
+          .collection('mypet')
+          .where('ownerId', isEqualTo: user.uid)
+          .get();
       return snapshot.docs.map((d) => {'id': d.id, ...d.data()}).toList();
     } catch (e) {
       return [];
@@ -172,7 +177,10 @@ class _DashboardHomeState extends State<DashboardHome> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) return;
-      final doc = await FirebaseFirestore.instance.collection('settings').doc(user.uid).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('settings')
+          .doc(user.uid)
+          .get();
       if (doc.exists) {
         final data = doc.data()!;
         setState(() {
@@ -190,8 +198,8 @@ class _DashboardHomeState extends State<DashboardHome> {
     final salutation = hour < 12
         ? 'Good morning'
         : hour < 17
-            ? 'Good afternoon'
-            : 'Good evening';
+        ? 'Good afternoon'
+        : 'Good evening';
     return '$salutation, $_name';
   }
 
@@ -210,7 +218,11 @@ class _DashboardHomeState extends State<DashboardHome> {
     final bucket = DateTime.now().hour ~/ 6;
     final paletteIndex = (bucket + seed) % _PetPalette.gradients.length;
     final colors = _PetPalette.gradients[paletteIndex];
-    return LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight);
+    return LinearGradient(
+      colors: colors,
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
   }
 
   Map<String, int> _computeMetrics(List<Map<String, dynamic>> pets) {
@@ -219,7 +231,9 @@ class _DashboardHomeState extends State<DashboardHome> {
       final list = p['appointments'] as List<dynamic>?;
       return acc + (list?.length ?? 0);
     });
-    final wellnessGood = pets.where((p) => (p['wellness'] ?? '').toString().toLowerCase() == 'good').length;
+    final wellnessGood = pets
+        .where((p) => (p['wellness'] ?? '').toString().toLowerCase() == 'good')
+        .length;
     return {
       'total': pets.length,
       'vaccinated': vaccinated,
@@ -241,7 +255,8 @@ class _DashboardHomeState extends State<DashboardHome> {
       suggestions.addAll(const [
         _SuggestionData(
           title: 'Add your first pet',
-          subtitle: 'Create a profile to unlock personalized reminders and nutrition plans.',
+          subtitle:
+              'Create a profile to unlock personalized reminders and nutrition plans.',
           icon: Icons.assignment_turned_in,
           color: Color(0xFF81C784),
         ),
@@ -256,45 +271,60 @@ class _DashboardHomeState extends State<DashboardHome> {
     }
 
     if (vaccinated < total) {
-      suggestions.add(const _SuggestionData(
-        title: 'Vaccination follow-up',
-        subtitle: 'Log the latest vaccine doses and set reminders for boosters.',
-        icon: Icons.vaccines,
-        color: Color(0xFFFFA726),
-      ));
+      suggestions.add(
+        const _SuggestionData(
+          title: 'Vaccination follow-up',
+          subtitle:
+              'Log the latest vaccine doses and set reminders for boosters.',
+          icon: Icons.vaccines,
+          color: Color(0xFFFFA726),
+        ),
+      );
     }
 
     if (appointments == 0) {
-      suggestions.add(const _SuggestionData(
-        title: 'Schedule a vet check',
-        subtitle: 'Routine wellness visits help spot issues earlier and keep insurance valid.',
-        icon: Icons.calendar_month,
-        color: Color(0xFF4FC3F7),
-      ));
+      suggestions.add(
+        const _SuggestionData(
+          title: 'Schedule a vet check',
+          subtitle:
+              'Routine wellness visits help spot issues earlier and keep insurance valid.',
+          icon: Icons.calendar_month,
+          color: Color(0xFF4FC3F7),
+        ),
+      );
     }
 
     if (wellness < total) {
-      suggestions.add(const _SuggestionData(
-        title: 'Boost daily enrichment',
-        subtitle: 'Add 15 minutes of sensory play or puzzles to reduce stress.',
-        icon: Icons.psychology_alt,
-        color: Color(0xFFBA68C8),
-      ));
+      suggestions.add(
+        const _SuggestionData(
+          title: 'Boost daily enrichment',
+          subtitle:
+              'Add 15 minutes of sensory play or puzzles to reduce stress.',
+          icon: Icons.psychology_alt,
+          color: Color(0xFFBA68C8),
+        ),
+      );
     }
 
-    suggestions.add(const _SuggestionData(
-      title: 'Hydration and nutrition',
-      subtitle: 'Rotate fresh water twice daily and balance meals with light evening feeds.',
-      icon: Icons.water_drop,
-      color: Color(0xFF4DB6AC),
-    ));
+    suggestions.add(
+      const _SuggestionData(
+        title: 'Hydration and nutrition',
+        subtitle:
+            'Rotate fresh water twice daily and balance meals with light evening feeds.',
+        icon: Icons.water_drop,
+        color: Color(0xFF4DB6AC),
+      ),
+    );
 
-    suggestions.add(const _SuggestionData(
-      title: 'Capture milestones',
-      subtitle: 'Upload today’s happiest moment to build a shared pet journal.',
-      icon: Icons.camera_alt,
-      color: Color(0xFFFFB74D),
-    ));
+    suggestions.add(
+      const _SuggestionData(
+        title: 'Capture milestones',
+        subtitle:
+            'Upload today’s happiest moment to build a shared pet journal.',
+        icon: Icons.camera_alt,
+        color: Color(0xFFFFB74D),
+      ),
+    );
 
     return suggestions;
   }
@@ -302,11 +332,15 @@ class _DashboardHomeState extends State<DashboardHome> {
   void _onMenuSelected(_DashMenuAction action) {
     switch (action) {
       case _DashMenuAction.editProfile:
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsTab()));
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const SettingsTab()));
         break;
       case _DashMenuAction.toggleTheme:
         setState(() {
-          themeModeNotifier.value = themeModeNotifier.value == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+          themeModeNotifier.value = themeModeNotifier.value == ThemeMode.dark
+              ? ThemeMode.light
+              : ThemeMode.dark;
         });
         break;
       case _DashMenuAction.toggleNotifications:
@@ -318,18 +352,26 @@ class _DashboardHomeState extends State<DashboardHome> {
         _showChangePasswordDialog();
         break;
       case _DashMenuAction.myPets:
-        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MyPetsPage()));
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const MyPetsPage()));
         break;
       case _DashMenuAction.myPosts:
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('My Posts coming soon')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('My Posts coming soon')));
         break;
       case _DashMenuAction.myOrders:
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('My Orders coming soon')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('My Orders coming soon')));
         break;
       case _DashMenuAction.logout:
         FirebaseAuth.instance.signOut();
         // It will fall back to auth gate in main.dart (assuming) or user handles manually
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Logged out')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Logged out')));
         break;
     }
   }
@@ -346,17 +388,26 @@ class _DashboardHomeState extends State<DashboardHome> {
           obscureText: true,
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(c),
+            child: const Text('Cancel'),
+          ),
           TextButton(
             onPressed: () async {
               try {
-                await FirebaseAuth.instance.currentUser?.updatePassword(ctrl.text.trim());
+                await FirebaseAuth.instance.currentUser?.updatePassword(
+                  ctrl.text.trim(),
+                );
                 if (mounted) {
                   Navigator.pop(c);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Password updated')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Password updated')),
+                  );
                 }
               } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Failed: $e')));
               }
             },
             child: const Text('Save'),
@@ -368,7 +419,8 @@ class _DashboardHomeState extends State<DashboardHome> {
 
   // Build display lines for Next Vaccine card: PetName: LAST_DATE → NEXT_DATE
   List<String> _buildNextVaccineLines(List<Map<String, dynamic>> pets) {
-    String fmt(DateTime dt) => '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    String fmt(DateTime dt) =>
+        '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
     final out = <String>[];
     for (final p in pets) {
       if (p['vaccinated'] == true) {
@@ -389,9 +441,39 @@ class _DashboardHomeState extends State<DashboardHome> {
     return out;
   }
 
+  Widget _buildPetImage(String? source) {
+    if (source == null || source.isEmpty) {
+      return const Center(
+        child: Icon(Icons.pets, size: 56, color: Colors.white),
+      );
+    }
+    if (source.startsWith('data:')) {
+      try {
+        final bytes = base64Decode(source.split(',').last);
+        return Image.memory(bytes, fit: BoxFit.cover);
+      } catch (_) {
+        return const Center(
+          child: Icon(Icons.pets, size: 56, color: Colors.white),
+        );
+      }
+    }
+    return Image.network(
+      source,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) =>
+          const Center(child: Icon(Icons.pets, size: 56, color: Colors.white)),
+    );
+  }
+
+  @override
+  void dispose() {
+    _petController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-  // final theme = Theme.of(context);
+    // final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: _PetPalette.surface,
       appBar: AppBar(
@@ -405,7 +487,9 @@ class _DashboardHomeState extends State<DashboardHome> {
           child: PopupMenuButton<_DashMenuAction>(
             offset: const Offset(0, 18),
             elevation: 8,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+            ),
             color: Colors.white,
             onSelected: _onMenuSelected,
             icon: Container(
@@ -421,50 +505,108 @@ class _DashboardHomeState extends State<DashboardHome> {
               child: const Icon(Icons.menu, color: Colors.white),
             ),
             itemBuilder: (context) {
-            final isDark = themeModeNotifier.value == ThemeMode.dark;
-            final List<PopupMenuEntry<_DashMenuAction>> entries = [
-              PopupMenuItem(
-                value: _DashMenuAction.editProfile,
-                child: Row(children: const [Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Edit Profile')]),
-              ),
-              PopupMenuItem(
-                value: _DashMenuAction.toggleTheme,
-                child: Row(children: [Icon(isDark ? Icons.dark_mode : Icons.light_mode, size: 20), const SizedBox(width: 8), Text(isDark ? 'Light Theme' : 'Dark Theme')]),
-              ),
-              PopupMenuItem(
-                value: _DashMenuAction.toggleNotifications,
-                child: Row(children: [Icon(_notificationsEnabled ? Icons.notifications_active : Icons.notifications_off, size: 20), const SizedBox(width: 8), Text('Notifications: ${_notificationsEnabled ? 'On' : 'Off'}')]),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                value: _DashMenuAction.changePassword,
-                child: Row(children: const [Icon(Icons.lock, size: 20), SizedBox(width: 8), Text('Change Password')]),
-              ),
-              PopupMenuItem(
-                value: _DashMenuAction.myPets,
-                child: Row(children: const [Icon(Icons.pets, size: 20), SizedBox(width: 8), Text('My Pets')]),
-              ),
-              PopupMenuItem(
-                value: _DashMenuAction.myPosts,
-                child: Row(children: const [Icon(Icons.forum, size: 20), SizedBox(width: 8), Text('My Posts')]),
-              ),
-            ];
-            if (_role == 'Shop Owner' || _role == 'Admin') {
+              final isDark = themeModeNotifier.value == ThemeMode.dark;
+              final List<PopupMenuEntry<_DashMenuAction>> entries = [
+                PopupMenuItem(
+                  value: _DashMenuAction.editProfile,
+                  child: Row(
+                    children: const [
+                      Icon(Icons.edit, size: 20),
+                      SizedBox(width: 8),
+                      Text('Edit Profile'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _DashMenuAction.toggleTheme,
+                  child: Row(
+                    children: [
+                      Icon(
+                        isDark ? Icons.dark_mode : Icons.light_mode,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(isDark ? 'Light Theme' : 'Dark Theme'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _DashMenuAction.toggleNotifications,
+                  child: Row(
+                    children: [
+                      Icon(
+                        _notificationsEnabled
+                            ? Icons.notifications_active
+                            : Icons.notifications_off,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Notifications: ${_notificationsEnabled ? 'On' : 'Off'}',
+                      ),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: _DashMenuAction.changePassword,
+                  child: Row(
+                    children: const [
+                      Icon(Icons.lock, size: 20),
+                      SizedBox(width: 8),
+                      Text('Change Password'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _DashMenuAction.myPets,
+                  child: Row(
+                    children: const [
+                      Icon(Icons.pets, size: 20),
+                      SizedBox(width: 8),
+                      Text('My Pets'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _DashMenuAction.myPosts,
+                  child: Row(
+                    children: const [
+                      Icon(Icons.forum, size: 20),
+                      SizedBox(width: 8),
+                      Text('My Posts'),
+                    ],
+                  ),
+                ),
+              ];
+              if (_role == 'Shop Owner' || _role == 'Admin') {
+                entries.add(
+                  PopupMenuItem(
+                    value: _DashMenuAction.myOrders,
+                    child: Row(
+                      children: const [
+                        Icon(Icons.shopping_bag, size: 20),
+                        SizedBox(width: 8),
+                        Text('My Orders'),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              entries.addAll(const [PopupMenuDivider()]);
               entries.add(
                 PopupMenuItem(
-                  value: _DashMenuAction.myOrders,
-                  child: Row(children: const [Icon(Icons.shopping_bag, size: 20), SizedBox(width: 8), Text('My Orders')]),
+                  value: _DashMenuAction.logout,
+                  child: Row(
+                    children: const [
+                      Icon(Icons.logout, size: 20, color: Colors.red),
+                      SizedBox(width: 8),
+                      Text('Logout'),
+                    ],
+                  ),
                 ),
               );
-            }
-            entries.addAll(const [PopupMenuDivider()]);
-            entries.add(
-              PopupMenuItem(
-                value: _DashMenuAction.logout,
-                child: Row(children: const [Icon(Icons.logout, size: 20, color: Colors.red), SizedBox(width: 8), Text('Logout')]),
-              ),
-            );
-            return entries;
+              return entries;
             },
           ),
         ),
@@ -474,7 +616,11 @@ class _DashboardHomeState extends State<DashboardHome> {
           children: [
             Text(
               _greeting(),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.black87),
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+              ),
             ),
             Text(
               'Let’s take great care of your companions',
@@ -488,7 +634,10 @@ class _DashboardHomeState extends State<DashboardHome> {
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: _PetPalette.primary.withOpacity(28 / 255),
                     borderRadius: BorderRadius.circular(20),
@@ -500,7 +649,11 @@ class _DashboardHomeState extends State<DashboardHome> {
                       const SizedBox(width: 6),
                       Text(
                         _role,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _PetPalette.primary),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _PetPalette.primary,
+                        ),
                       ),
                     ],
                   ),
@@ -535,14 +688,27 @@ class _DashboardHomeState extends State<DashboardHome> {
             FutureBuilder<List<Map<String, dynamic>>>(
               future: _petsFuture,
               builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const SizedBox(
+                    height: 240,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
                 final pets = snapshot.data ?? [];
                 final metrics = _computeMetrics(pets);
                 final gradient = _heroGradient((metrics['total'] ?? 0) + 1);
-                final featurePet = pets.isNotEmpty ? pets[_petIndex % pets.length] : null;
-                final featureName = featurePet?['name']?.toString() ?? 'Your next adventure';
+                final featurePet = pets.isNotEmpty
+                    ? pets[_petIndex % pets.length]
+                    : null;
+                final featureName =
+                    featurePet?['name']?.toString() ?? 'Your next adventure';
 
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 400),
                     curve: Curves.easeInOut,
@@ -550,7 +716,11 @@ class _DashboardHomeState extends State<DashboardHome> {
                       gradient: gradient,
                       borderRadius: BorderRadius.circular(28),
                       boxShadow: const [
-                        BoxShadow(color: Color(0x336750A4), blurRadius: 20, offset: Offset(0, 12)),
+                        BoxShadow(
+                          color: Color(0x336750A4),
+                          blurRadius: 20,
+                          offset: Offset(0, 12),
+                        ),
                       ],
                     ),
                     child: SafeArea(
@@ -570,23 +740,35 @@ class _DashboardHomeState extends State<DashboardHome> {
                                     color: Colors.white.withOpacity(60 / 255),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
-                                  child: const Icon(Icons.pets, size: 34, color: Colors.white),
+                                  child: const Icon(
+                                    Icons.pets,
+                                    size: 34,
+                                    color: Colors.white,
+                                  ),
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Welcome back, ${widget.userName}',
-                                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w700,
+                                        ),
                                       ),
                                       const SizedBox(height: 6),
                                       Text(
                                         pets.isEmpty
                                             ? 'Add your first companion to unlock health insights and reminders.'
-                                            : 'Today is perfect for a quick check on $featureName’s routine.',
-                                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                                            : 'Today is perfect for a quick check on $featureName\'s routine.',
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 13,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -596,11 +778,20 @@ class _DashboardHomeState extends State<DashboardHome> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                     foregroundColor: _PetPalette.primary,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(22),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 12,
+                                    ),
                                     elevation: 0,
                                   ),
-                                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FindDiseasePage())),
+                                  onPressed: () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const FindDiseasePage(),
+                                    ),
+                                  ),
                                   icon: const Icon(Icons.monitor_heart),
                                   label: const Text('Health Scan'),
                                 ),
@@ -611,10 +802,28 @@ class _DashboardHomeState extends State<DashboardHome> {
                               spacing: 12,
                               runSpacing: 8,
                               children: [
-                                _HeroMetricChip(icon: Icons.pets, label: 'Companions', value: metrics['total']?.toString() ?? '0'),
-                                _HeroMetricChip(icon: Icons.vaccines, label: 'Vaccinated', value: metrics['vaccinated']?.toString() ?? '0'),
-                                _HeroMetricChip(icon: Icons.event_available, label: 'Appointments', value: metrics['appointments']?.toString() ?? '0'),
-                                _HeroMetricChip(icon: Icons.favorite, label: 'Wellness good', value: metrics['wellness']?.toString() ?? '0'),
+                                _HeroMetricChip(
+                                  icon: Icons.pets,
+                                  label: 'Companions',
+                                  value: (metrics['total'] ?? 0).toString(),
+                                ),
+                                _HeroMetricChip(
+                                  icon: Icons.vaccines,
+                                  label: 'Vaccinated',
+                                  value: (metrics['vaccinated'] ?? 0)
+                                      .toString(),
+                                ),
+                                _HeroMetricChip(
+                                  icon: Icons.event_available,
+                                  label: 'Appointments',
+                                  value: (metrics['appointments'] ?? 0)
+                                      .toString(),
+                                ),
+                                _HeroMetricChip(
+                                  icon: Icons.favorite,
+                                  label: 'Wellness good',
+                                  value: (metrics['wellness'] ?? 0).toString(),
+                                ),
                               ],
                             ),
                           ],
@@ -626,305 +835,453 @@ class _DashboardHomeState extends State<DashboardHome> {
               },
             ),
 
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
 
-          // small stats row (driven from user's pets)
-          FutureBuilder<List<Map<String, dynamic>>>(
-            future: _petsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: const [
-                      Expanded(child: _StatCard(icon: Icons.hourglass_top, title: 'Loading', value: '...')),
-                      SizedBox(width: 10),
-                      Expanded(child: _StatCard(icon: Icons.hourglass_top, title: '', value: '')),
-                      SizedBox(width: 10),
-                      Expanded(child: _StatCard(icon: Icons.hourglass_top, title: '', value: '')),
-                    ],
-                  ),
-                );
-              }
-              final pets = snapshot.data ?? [];
-              final vaccinated = pets.where((p) => (p['vaccinated'] == true)).length;
-              final appointments = pets.fold<int>(0, (acc, p) {
-                final list = p['appointments'] as List<dynamic>?;
-                return acc + (list?.length ?? 0);
-              });
-              final wellnessGood = pets.where((p) => (p['wellness'] ?? '').toString().toLowerCase() == 'good').length;
+            // small stats row (driven from user's pets)
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _petsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: const [
+                        Expanded(
+                          child: _StatCard(
+                            icon: Icons.hourglass_top,
+                            title: 'Loading',
+                            value: '...',
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: _StatCard(
+                            icon: Icons.hourglass_top,
+                            title: '',
+                            value: '',
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: _StatCard(
+                            icon: Icons.hourglass_top,
+                            title: '',
+                            value: '',
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                final pets = snapshot.data ?? [];
+                final vaccinated = pets
+                    .where((p) => (p['vaccinated'] == true))
+                    .length;
+                final appointments = pets.fold<int>(0, (acc, p) {
+                  final list = p['appointments'] as List<dynamic>?;
+                  return acc + (list?.length ?? 0);
+                });
+                final wellnessGood = pets
+                    .where(
+                      (p) =>
+                          (p['wellness'] ?? '').toString().toLowerCase() ==
+                          'good',
+                    )
+                    .length;
 
-              // Build detail lines for dialogs
-              final vaccinatedLines = pets
-                  .where((p) => (p['vaccinated'] == true))
-                  .map((p) => (p['name'] ?? 'Pet').toString())
-                  .toList();
-              final wellnessLines = pets
-                  .where((p) => (p['wellness'] ?? '').toString().toLowerCase() == 'good')
-                  .map((p) => (p['name'] ?? 'Pet').toString())
-                  .toList();
-              final appointmentLines = <String>[];
-              for (final p in pets) {
-                final name = (p['name'] ?? 'Pet').toString();
-                final appts = p['appointments'] as List?;
-                if (appts != null && appts.isNotEmpty) {
-                  for (final a in appts) {
-                    if (a is Map) {
-                      final date = a['date'] ?? a['time'] ?? a['scheduled'] ?? 'Appointment';
-                      final note = a['note'] ?? a['details'] ?? '';
-                      appointmentLines.add('$name: $date${note.toString().isNotEmpty ? ' – $note' : ''}');
-                    } else {
-                      appointmentLines.add('$name: ${a.toString()}');
+                // Build detail lines for dialogs
+                final vaccinatedLines = pets
+                    .where((p) => (p['vaccinated'] == true))
+                    .map((p) => (p['name'] ?? 'Pet').toString())
+                    .toList();
+                final wellnessLines = pets
+                    .where(
+                      (p) =>
+                          (p['wellness'] ?? '').toString().toLowerCase() ==
+                          'good',
+                    )
+                    .map((p) => (p['name'] ?? 'Pet').toString())
+                    .toList();
+                final appointmentLines = <String>[];
+                for (final p in pets) {
+                  final name = (p['name'] ?? 'Pet').toString();
+                  final appts = p['appointments'] as List?;
+                  if (appts != null && appts.isNotEmpty) {
+                    for (final a in appts) {
+                      if (a is Map) {
+                        final date =
+                            a['date'] ??
+                            a['time'] ??
+                            a['scheduled'] ??
+                            'Appointment';
+                        final note = a['note'] ?? a['details'] ?? '';
+                        appointmentLines.add(
+                          '$name: $date${note.toString().isNotEmpty ? ' – $note' : ''}',
+                        );
+                      } else {
+                        appointmentLines.add('$name: ${a.toString()}');
+                      }
                     }
                   }
                 }
-              }
 
-              void showDetail(String title, List<String> lines) {
-                showModalBottomSheet(
-                  context: context,
-                  shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                  ),
-                  builder: (ctx) {
-                    return SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                                const Spacer(),
-                                IconButton(
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () => Navigator.pop(ctx),
+                void showDetail(String title, List<String> lines) {
+                  showModalBottomSheet(
+                    context: context,
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                    ),
+                    builder: (ctx) {
+                      return SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    title,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  IconButton(
+                                    icon: const Icon(Icons.close),
+                                    onPressed: () => Navigator.pop(ctx),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              if (lines.isEmpty)
+                                Text(
+                                  'No details found.',
+                                  style: TextStyle(color: Colors.grey.shade600),
                                 )
+                              else
+                                Expanded(
+                                  child: ListView.separated(
+                                    itemCount: lines.length,
+                                    separatorBuilder: (_, __) =>
+                                        const Divider(height: 1),
+                                    itemBuilder: (_, i) => ListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: Text(lines[i]),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.vaccines_outlined,
+                          title: 'Vaccinated',
+                          value: vaccinated.toString(),
+                          onTap: () =>
+                              showDetail('Vaccinated Pets', vaccinatedLines),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.spa_outlined,
+                          title: 'Wellness Good',
+                          value: wellnessGood.toString(),
+                          onTap: () =>
+                              showDetail('Wellness Good', wellnessLines),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.event_available,
+                          title: 'Appointments',
+                          value: appointments.toString(),
+                          onTap: () =>
+                              showDetail('Appointments', appointmentLines),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            const SizedBox(height: 14),
+
+            // pet carousel (loaded from Firestore)
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: _petsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const SizedBox(
+                    height: 170,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final pets = snapshot.data ?? [];
+                if (pets.isEmpty) {
+                  return SizedBox(
+                    height: 140,
+                    child: Center(
+                      child: Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Text(
+                            'No pets found. Add a pet to get started',
+                            style: TextStyle(color: Colors.grey.shade700),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: [
+                    SizedBox(
+                      height: 192,
+                      child: PageView.builder(
+                        controller: _petController,
+                        itemCount: pets.length,
+                        onPageChanged: (i) => setState(() => _petIndex = i),
+                        itemBuilder: (context, index) {
+                          final pet = pets[index];
+                          final name = pet['name']?.toString() ?? 'Pet';
+                          final desc =
+                              pet['desc']?.toString() ??
+                              'No recent activity yet.';
+                          final img = pet['image']?.toString() ?? '';
+                          final species =
+                              (pet['species'] ?? pet['type'] ?? 'Companion')
+                                  .toString();
+                          final age = pet['age'];
+                          final weight = pet['weight'];
+                          final wellness = (pet['wellness'] ?? 'Balanced')
+                              .toString();
+                          final gradient = LinearGradient(
+                            colors:
+                                _PetPalette.gradients[(index + 1) %
+                                    _PetPalette.gradients.length],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          );
+
+                          final card = Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(26),
+                              gradient: gradient,
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x226750A4),
+                                  blurRadius: 18,
+                                  offset: Offset(0, 10),
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            if (lines.isEmpty)
-                              Text('No details found.', style: TextStyle(color: Colors.grey.shade600))
-                            else
-                              Expanded(
-                                child: ListView.separated(
-                                  itemCount: lines.length,
-                                  separatorBuilder: (_, __) => const Divider(height: 1),
-                                  itemBuilder: (_, i) => ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text(lines[i]),
+                            child: Row(
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: Container(
+                                      width: 116,
+                                      height: 116,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(
+                                          80 / 255,
+                                        ),
+                                      ),
+                                      child: _buildPetImage(img),
+                                    ),
                                   ),
                                 ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              }
-
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.vaccines_outlined,
-                        title: 'Vaccinated',
-                        value: vaccinated.toString(),
-                        onTap: () => showDetail('Vaccinated Pets', vaccinatedLines),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.spa_outlined,
-                        title: 'Wellness Good',
-                        value: wellnessGood.toString(),
-                        onTap: () => showDetail('Wellness Good', wellnessLines),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.event_available,
-                        title: 'Appointments',
-                        value: appointments.toString(),
-                        onTap: () => showDetail('Appointments', appointmentLines),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-
-          const SizedBox(height: 14),
-
-          // pet carousel (loaded from Firestore)
-          FutureBuilder<List<Map<String, dynamic>>>(
-            future: _petsFuture,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const SizedBox(height: 170, child: Center(child: CircularProgressIndicator()));
-              }
-              final pets = snapshot.data ?? [];
-              if (pets.isEmpty) {
-                return SizedBox(
-                  height: 140,
-                  child: Center(
-                    child: Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Text('No pets found. Add a pet to get started', style: TextStyle(color: Colors.grey.shade700)),
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              return SizedBox(
-                height: 170,
-                child: PageView.builder(
-                  controller: _petController,
-                  itemCount: pets.length,
-                  onPageChanged: (i) => setState(() => _petIndex = i),
-                  itemBuilder: (context, index) {
-                    final pet = pets[index];
-                    final name = pet['name']?.toString() ?? 'Pet';
-                    final desc = pet['desc']?.toString() ?? 'No recent activity yet.';
-                    final img = pet['image']?.toString() ?? '';
-                    final species = (pet['species'] ?? pet['type'] ?? 'Companion').toString();
-                    final age = pet['age'];
-                    final weight = pet['weight'];
-                    final wellness = (pet['wellness'] ?? 'Balanced').toString();
-                    final gradient = LinearGradient(
-                      colors: _PetPalette.gradients[(index + 1) % _PetPalette.gradients.length],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    );
-
-                    return AnimatedScale(
-                      duration: const Duration(milliseconds: 320),
-                      scale: _petIndex == index ? 1 : 0.94,
-                      curve: Curves.easeOutBack,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(26),
-                          gradient: gradient,
-                          boxShadow: const [
-                            BoxShadow(color: Color(0x226750A4), blurRadius: 18, offset: Offset(0, 10)),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  width: 116,
-                                  height: 116,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(80 / 255),
-                                  ),
-                                  child: Builder(
-                                    builder: (context) {
-                                      if (img.isNotEmpty) {
-                                        if (img.startsWith('data:')) {
-                                          final bytes = base64Decode(img.split(',').last);
-                                          return Image.memory(bytes, fit: BoxFit.cover);
-                                        } else {
-                                          return Image.network(img, fit: BoxFit.cover);
-                                        }
-                                      }
-                                      return const Center(
-                                        child: Icon(Icons.pets, size: 56, color: Colors.white),
-                                      );
-                                    },
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      0,
+                                      18,
+                                      18,
+                                      18,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                name,
+                                                style: const TextStyle(
+                                                  fontSize: 20,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Colors.white,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            _InfoChip(
+                                              icon: Icons.pets,
+                                              label: species,
+                                              color: Colors.white,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          desc,
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 13,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 6,
+                                          children: [
+                                            if (age != null)
+                                              _InfoChip(
+                                                icon: Icons.cake_outlined,
+                                                label: '${age.toString()} yrs',
+                                              ),
+                                            if (weight != null)
+                                              _InfoChip(
+                                                icon: Icons
+                                                    .monitor_weight_outlined,
+                                                label:
+                                                    '${weight.toString()} kg',
+                                              ),
+                                            _InfoChip(
+                                              icon: Icons.favorite_outline,
+                                              label: wellness,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Row(
+                                          children: [
+                                            ElevatedButton(
+                                              onPressed: () {},
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: Colors.white,
+                                                foregroundColor:
+                                                    _PetPalette.primary,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(26),
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 20,
+                                                      vertical: 10,
+                                                    ),
+                                                elevation: 0,
+                                              ),
+                                              child: const Text('Profile'),
+                                            ),
+                                            const SizedBox(width: 10),
+                                            TextButton(
+                                              onPressed: () {},
+                                              style: TextButton.styleFrom(
+                                                foregroundColor: Colors.white,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(26),
+                                                ),
+                                              ),
+                                              child: const Text('Care Log'),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(0, 20, 18, 20),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            name,
-                                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        _InfoChip(icon: Icons.pets, label: species, color: Colors.white),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      desc,
-                                      style: const TextStyle(color: Colors.white70, fontSize: 13),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 6,
-                                      children: [
-                                        if (age != null) _InfoChip(icon: Icons.cake_outlined, label: '${age.toString()} yrs'),
-                                        if (weight != null) _InfoChip(icon: Icons.monitor_weight_outlined, label: '${weight.toString()} kg'),
-                                        _InfoChip(icon: Icons.favorite_outline, label: wellness),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 16),
-                                    Row(
-                                      children: [
-                                        ElevatedButton(
-                                          onPressed: () {},
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.white,
-                                            foregroundColor: _PetPalette.primary,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-                                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                                            elevation: 0,
-                                          ),
-                                          child: const Text('Profile'),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        TextButton(
-                                          onPressed: () {},
-                                          style: TextButton.styleFrom(
-                                            foregroundColor: Colors.white,
-                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(26)),
-                                          ),
-                                          child: const Text('Care Log'),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )
-                          ],
-                        ),
+                          );
+
+                          return AnimatedBuilder(
+                            animation: _petController,
+                            builder: (context, child) {
+                              var scale = 1.0;
+                              if (_petController.hasClients &&
+                                  _petController.position.haveDimensions) {
+                                final page =
+                                    _petController.page ?? _petIndex.toDouble();
+                                final distance = (page - index).abs();
+                                scale = (1 - distance * 0.18).clamp(0.82, 1.0);
+                              } else {
+                                scale = _petIndex == index ? 1.0 : 0.9;
+                              }
+                              final normalized = ((scale - 0.82) / 0.18).clamp(
+                                0.0,
+                                1.0,
+                              );
+                              final opacity = 0.6 + normalized * 0.4;
+                              return Transform.scale(
+                                scale: scale,
+                                alignment: Alignment.center,
+                                child: Opacity(opacity: opacity, child: child),
+                              );
+                            },
+                            child: card,
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
+                    ),
+                    if (pets.length > 1) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(pets.length, (index) {
+                          final isActive = index == _petIndex;
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 240),
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            height: 6,
+                            width: isActive ? 18 : 8,
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? _PetPalette.primary
+                                  : _PetPalette.primary.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          );
+                        }),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
 
             const SizedBox(height: 12),
 
@@ -934,35 +1291,103 @@ class _DashboardHomeState extends State<DashboardHome> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Quick Actions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Quick Actions',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 10),
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final actions = <_QuickAction>[
-                        _QuickAction(title: 'Emergency', icon: Icons.medical_services_outlined, color: const Color(0xFFE57373), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => EmergencyContactPage()))),
-                        _QuickAction(title: 'Community', icon: Icons.forum_outlined, color: _PetPalette.primary, onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => CommunityForumPage()))),
-                        _QuickAction(title: 'Adoption', icon: Icons.volunteer_activism_outlined, color: const Color(0xFF4DB6AC), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AdoptionPage()))),
-                        _QuickAction(title: 'Pet Shop', icon: Icons.shopping_bag_outlined, color: const Color(0xFFFFC178), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PetShopPage()))),
-                        _QuickAction(title: 'Care Hub', icon: Icons.monitor_heart_outlined, color: const Color(0xFF7986CB), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PetCareHub()))),
-                        _QuickAction(title: 'Lost Pet', icon: Icons.search, color: const Color(0xFFEF9A9A), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LostPetPage()))),
-                        _QuickAction(title: 'Found Pet', icon: Icons.favorite_outline, color: const Color(0xFFA5D6A7), onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FoundPetPage()))),
+                        _QuickAction(
+                          title: 'Emergency',
+                          icon: Icons.medical_services_outlined,
+                          color: const Color(0xFFE57373),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => EmergencyContactPage(),
+                            ),
+                          ),
+                        ),
+                        _QuickAction(
+                          title: 'Community',
+                          icon: Icons.forum_outlined,
+                          color: _PetPalette.primary,
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CommunityForumPage(),
+                            ),
+                          ),
+                        ),
+                        _QuickAction(
+                          title: 'Adoption',
+                          icon: Icons.volunteer_activism_outlined,
+                          color: const Color(0xFF4DB6AC),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const AdoptionPage(),
+                            ),
+                          ),
+                        ),
+                        _QuickAction(
+                          title: 'Pet Shop',
+                          icon: Icons.shopping_bag_outlined,
+                          color: const Color(0xFFFFC178),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const PetShopPage(),
+                            ),
+                          ),
+                        ),
+                        _QuickAction(
+                          title: 'Care Hub',
+                          icon: Icons.monitor_heart_outlined,
+                          color: const Color(0xFF7986CB),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const PetCareHub(),
+                            ),
+                          ),
+                        ),
+                        _QuickAction(
+                          title: 'Lost Pet',
+                          icon: Icons.search,
+                          color: const Color(0xFFEF9A9A),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const LostPetPage(),
+                            ),
+                          ),
+                        ),
+                        _QuickAction(
+                          title: 'Found Pet',
+                          icon: Icons.favorite_outline,
+                          color: const Color(0xFFA5D6A7),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const FoundPetPage(),
+                            ),
+                          ),
+                        ),
                       ];
                       // target small square buttons ~72px, wrap to multiple rows if needed
-                        final double spacing = 10;
+                      final double spacing = 10;
 
                       return Wrap(
                         spacing: spacing,
                         runSpacing: spacing,
                         children: [
-                          for (final a in actions)
-                            _MiniActionButton(action: a),
+                          for (final a in actions) _MiniActionButton(action: a),
                         ],
                       );
                     },
                   ),
 
                   const SizedBox(height: 18),
-                  const Text('Overview', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Overview',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 10),
                   FutureBuilder<List<Map<String, dynamic>>>(
                     future: _petsFuture,
@@ -973,7 +1398,9 @@ class _DashboardHomeState extends State<DashboardHome> {
                       String foodLogDetailsShort() {
                         if (pets.isEmpty) return 'No pets yet';
                         final count = pets.length;
-                        final meals = count <= 2 ? 'Meals: 2 + snack' : 'Meals: 3 daily';
+                        final meals = count <= 2
+                            ? 'Meals: 2 + snack'
+                            : 'Meals: 3 daily';
                         return '$meals\nAM: Protein • PM: Light • Eve: Balanced';
                       }
 
@@ -1003,18 +1430,24 @@ class _DashboardHomeState extends State<DashboardHome> {
 
                   const SizedBox(height: 18),
                   const SizedBox(height: 4),
-                  const Text('Smart Care Suggestions', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Smart Care Suggestions',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 10),
                   SizedBox(
                     height: 150,
                     child: FutureBuilder<List<Map<String, dynamic>>>(
                       future: _petsFuture,
                       builder: (context, snapshot) {
-                        final suggestions = _generateSuggestions(snapshot.data ?? []);
+                        final suggestions = _generateSuggestions(
+                          snapshot.data ?? [],
+                        );
                         return ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: suggestions.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 12),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 12),
                           itemBuilder: (context, index) {
                             final suggestion = suggestions[index];
                             return _SuggestionCard(
@@ -1032,7 +1465,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                   const SizedBox(height: 24),
                 ],
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -1056,7 +1489,12 @@ class _QuickAction {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  const _QuickAction({required this.title, required this.icon, required this.color, required this.onTap});
+  const _QuickAction({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
 }
 
 class _SuggestionData {
@@ -1065,7 +1503,12 @@ class _SuggestionData {
   final IconData icon;
   final Color color;
 
-  const _SuggestionData({required this.title, required this.subtitle, required this.icon, required this.color});
+  const _SuggestionData({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+  });
 }
 
 // ================== COMPONENTS ==================
@@ -1074,7 +1517,11 @@ class _HeroMetricChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  const _HeroMetricChip({required this.icon, required this.label, required this.value});
+  const _HeroMetricChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1092,7 +1539,11 @@ class _HeroMetricChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             '$value $label',
-            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -1113,7 +1564,12 @@ class _StatCard extends StatelessWidget {
   final String value;
   final VoidCallback? onTap;
 
-  const _StatCard({required this.icon, required this.title, required this.value, this.onTap});
+  const _StatCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1130,7 +1586,11 @@ class _StatCard extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         boxShadow: const [
-          BoxShadow(color: Color(0x1A6750A4), blurRadius: 14, offset: Offset(0, 8)),
+          BoxShadow(
+            color: Color(0x1A6750A4),
+            blurRadius: 14,
+            offset: Offset(0, 8),
+          ),
         ],
       ),
       child: Column(
@@ -1149,7 +1609,11 @@ class _StatCard extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             value,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -1200,7 +1664,11 @@ class _MiniActionButton extends StatelessWidget {
               ),
               border: Border.all(color: action.color.withOpacity(96 / 255)),
               boxShadow: [
-                BoxShadow(color: action.color.withOpacity(64 / 255), blurRadius: 14, offset: const Offset(0, 8)),
+                BoxShadow(
+                  color: action.color.withOpacity(64 / 255),
+                  blurRadius: 14,
+                  offset: const Offset(0, 8),
+                ),
               ],
             ),
             padding: const EdgeInsets.all(12),
@@ -1220,7 +1688,11 @@ class _MiniActionButton extends StatelessWidget {
                 Text(
                   action.title,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1246,7 +1718,9 @@ class _InfoChip extends StatelessWidget {
     final Color textColor;
     if (color != null) {
       baseColor = color!;
-      textColor = color!.computeLuminance() > 0.6 ? Colors.black87 : Colors.white;
+      textColor = color!.computeLuminance() > 0.6
+          ? Colors.black87
+          : Colors.white;
     } else {
       baseColor = const Color(0xFF212121).withAlpha(210);
       textColor = const Color(0xFF212121);
@@ -1265,7 +1739,11 @@ class _InfoChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: textColor),
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
           ),
         ],
       ),
@@ -1279,7 +1757,12 @@ class _RichOverviewCard extends StatelessWidget {
   final String title;
   final List<String> lines;
   final Color color;
-  const _RichOverviewCard({required this.icon, required this.title, required this.lines, required this.color});
+  const _RichOverviewCard({
+    required this.icon,
+    required this.title,
+    required this.lines,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1293,7 +1776,11 @@ class _RichOverviewCard extends StatelessWidget {
         ),
         border: Border.all(color: color.withAlpha(72)),
         boxShadow: [
-          BoxShadow(color: color.withAlpha(64), blurRadius: 16, offset: const Offset(0, 10)),
+          BoxShadow(
+            color: color.withAlpha(64),
+            blurRadius: 16,
+            offset: const Offset(0, 10),
+          ),
         ],
       ),
       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 18),
@@ -1304,13 +1791,23 @@ class _RichOverviewCard extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.white.withAlpha(190), borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(190),
+                  borderRadius: BorderRadius.circular(14),
+                ),
                 child: Icon(icon, color: color, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
-              )
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1319,7 +1816,11 @@ class _RichOverviewCard extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 6),
               child: Text(
                 line,
-                style: const TextStyle(fontSize: 12, color: Colors.white70, height: 1.3),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Colors.white70,
+                  height: 1.3,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -1327,7 +1828,11 @@ class _RichOverviewCard extends StatelessWidget {
           if (lines.length > 4)
             Text(
               '+ ${lines.length - 4} more',
-              style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
             ),
         ],
       ),
@@ -1340,7 +1845,12 @@ class _SuggestionCard extends StatelessWidget {
   final String subtitle;
   final IconData icon;
   final Color color;
-  const _SuggestionCard({required this.title, required this.subtitle, required this.icon, required this.color});
+  const _SuggestionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1351,20 +1861,37 @@ class _SuggestionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withAlpha(36),
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 6, offset: const Offset(0, 3))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(20),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withAlpha(56), borderRadius: BorderRadius.circular(14)),
+            decoration: BoxDecoration(
+              color: color.withAlpha(56),
+              borderRadius: BorderRadius.circular(14),
+            ),
             child: Icon(icon, color: color, size: 24),
           ),
           const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
           const SizedBox(height: 6),
-          Text(subtitle, style: const TextStyle(fontSize: 12, color: Colors.black87), maxLines: 3, overflow: TextOverflow.ellipsis),
+          Text(
+            subtitle,
+            style: const TextStyle(fontSize: 12, color: Colors.black87),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );

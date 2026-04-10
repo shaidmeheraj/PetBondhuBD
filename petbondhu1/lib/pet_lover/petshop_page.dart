@@ -69,8 +69,8 @@ class _PetShopPageState extends State<PetShopPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('You must be signed in to list products.')),
       );
+      return;
     }
-    if (user == null) return;
     setState(() => _saving = true);
     try {
       await FirebaseFirestore.instance.collection('product').add({

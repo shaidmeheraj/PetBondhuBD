@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -23,9 +25,28 @@ class _AdoptionPageState extends State<AdoptionPage> {
   bool _saving = false;
   // 0 = available pets listing, 1 = post for adoption form
   int _viewIndex = 0;
+  StreamSubscription<User?>? _authSub;
+  String? _currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    _authSub = FirebaseAuth.instance.authStateChanges().listen((user) {
+      if (!mounted) return;
+      setState(() => _currentUserId = user?.uid);
+    });
+  }
 
   Future<void> _addAdoptionPost() async {
     if (!(_adoptFormKey.currentState?.validate() ?? false)) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You must be signed in to publish adoption posts.')),
+      );
+      return;
+    }
     try {
       setState(() => _saving = true);
       final imageValue = _pickedImageBase64 ?? _petImageCtrl.text.trim();
@@ -37,6 +58,8 @@ class _AdoptionPageState extends State<AdoptionPage> {
         'contact': _petContactCtrl.text.trim(),
         'status': 'available',
         'timestamp': FieldValue.serverTimestamp(),
+        'ownerId': user.uid,
+        'ownerEmail': user.email ?? '',
       });
 
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Adoption post added!')));
@@ -57,7 +80,20 @@ class _AdoptionPageState extends State<AdoptionPage> {
     }
   }
 
-  Future<void> _updateAdoptionStatus(DocumentReference ref, String status) async {
+  Future<void> _updateAdoptionStatus(
+    DocumentReference ref,
+    String status,
+    String ownerId,
+  ) async {
+    final canManage = _currentUserId != null && ownerId == _currentUserId;
+    if (!canManage) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Only the author can update this status.')),
+        );
+      }
+      return;
+    }
     try {
       await ref.update({
         'status': status,
@@ -154,6 +190,8 @@ class _AdoptionPageState extends State<AdoptionPage> {
             final desc = (data['desc'] ?? '').toString();
             final contact = (data['contact'] ?? '').toString();
             final status = (data['status'] ?? 'available').toString();
+            final ownerId = (data['ownerId'] ?? '').toString();
+            final isOwner = ownerId.isNotEmpty && ownerId == _currentUserId;
 
             Color chipColor;
             String chipLabel;
@@ -212,19 +250,32 @@ class _AdoptionPageState extends State<AdoptionPage> {
                         style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
                       ),
                       const SizedBox(height: 6),
-                      PopupMenuButton<String>(
-                        tooltip: 'Status',
-                        onSelected: (v) => _updateAdoptionStatus(doc.reference, v),
-                        itemBuilder: (c) => const [
-                          PopupMenuItem(value: 'available', child: Text('Set Available')),
-                          PopupMenuItem(value: 'discussion', child: Text('In Discussion')),
-                          PopupMenuItem(value: 'adopted', child: Text('Mark Adopted')),
-                        ],
-                        child: const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-                          child: Text('Change Status'),
+                      if (isOwner)
+                        PopupMenuButton<String>(
+                          tooltip: 'Status',
+                          onSelected: (v) => _updateAdoptionStatus(
+                            doc.reference,
+                            v,
+                            ownerId,
+                          ),
+                          itemBuilder: (c) => const [
+                            PopupMenuItem(value: 'available', child: Text('Set Available')),
+                            PopupMenuItem(value: 'discussion', child: Text('In Discussion')),
+                            PopupMenuItem(value: 'adopted', child: Text('Mark Adopted')),
+                          ],
+                          child: const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+                            child: Text('Change Status'),
+                          ),
+                        )
+                      else
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Status locked for you',
+                            style: TextStyle(fontSize: 12, color: Colors.black54),
+                          ),
                         ),
-                      ),
                     ],
                   )
                 ]),
@@ -271,6 +322,7 @@ class _AdoptionPageState extends State<AdoptionPage> {
 
   @override
   void dispose() {
+    _authSub?.cancel();
     _petNameCtrl.dispose();
     _petTypeCtrl.dispose();
     _petDescCtrl.dispose();
@@ -286,6 +338,23 @@ class _AdoptionPageState extends State<AdoptionPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Post for Adoption', style: Theme.of(context).textTheme.titleLarge),
+          if (_currentUserId == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: const Text(
+                  'Sign in to publish and manage your adoption posts.',
+                  style: TextStyle(color: Colors.deepOrange),
+                ),
+              ),
+            ),
           const SizedBox(height: 12),
           Form(
             key: _adoptFormKey,
@@ -346,7 +415,8 @@ class _AdoptionPageState extends State<AdoptionPage> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _saving ? null : _addAdoptionPost,
+                    onPressed:
+                        _saving || _currentUserId == null ? null : _addAdoptionPost,
                     icon: const Icon(Icons.send),
                     label: Text(_saving ? 'Posting...' : 'Post for Adoption'),
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
