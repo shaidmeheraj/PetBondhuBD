@@ -88,7 +88,7 @@ PetBondhuBD acts as a **digital companion for pet owners**, combining healthcare
 
 The following diagram shows the high-level architecture of PetBondhuBD, including Flutter frontend, FastAPI backend, Firebase services, and AI modules.
 
-![PetBondhuBD System Architecture](./PetBondhuBD%20System%20Architecture.png)
+![PetBondhuBD System Architecture](./System%20Architecture.png)
 
 ## 🚀 Future Enhancements
 
