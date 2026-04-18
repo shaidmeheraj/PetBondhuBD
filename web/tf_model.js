@@ -4,7 +4,7 @@ let _modelPromise = null;
 function loadPetModel() {
   if (!_modelPromise) {
     // If you converted a Keras model with tensorflowjs, this is a LayersModel
-    _modelPromise = tf.loadLayersModel('web/web_model/model.json');
+    _modelPromise = tf.loadLayersModel('web_model/model.json');
   }
   return _modelPromise;
 }
